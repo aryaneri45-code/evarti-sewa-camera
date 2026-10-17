@@ -25,6 +25,9 @@ const formatCurrency = (amount) => new Intl.NumberFormat('id-ID', {
 const formatDate = (value = new Date()) => new Intl.DateTimeFormat('id-ID', {
   day: '2-digit', month: 'short', year: 'numeric',
 }).format(new Date(value));
+const jakartaToday = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Jakarta',
+}).format(new Date());
 const calcEndTime = (start, minutes) => {
   if (!start || !minutes) return '';
   const [hours, mins] = start.split(':').map(Number);
@@ -205,7 +208,8 @@ function App() {
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
-  const [reportDate, setReportDate] = useState('');
+  const [reportDate, setReportDate] = useState(jakartaToday);
+  const [reportPeriod, setReportPeriod] = useState('weekly');
   const [reportCashier, setReportCashier] = useState('all');
   const [reportLocation, setReportLocation] = useState('all');
   const [page, setPage] = useState('dashboard');
@@ -436,6 +440,7 @@ function App() {
           {page === 'reports' && isOwner && <Reports
             report={report} loading={reportLoading} error={reportError}
             date={reportDate} setDate={setReportDate}
+            period={reportPeriod} setPeriod={setReportPeriod}
             cashier={reportCashier} setCashier={setReportCashier}
             location={reportLocation} setLocation={setReportLocation}
             onLoad={async () => {
@@ -443,6 +448,7 @@ function App() {
               setReportError('');
               try {
                 const nextReport = await api.reportSummary({
+                  period: reportPeriod,
                   date: reportDate,
                   cashier: reportCashier,
                   location: reportLocation,
@@ -457,6 +463,7 @@ function App() {
             onExport={async () => {
               try {
                 const blob = await api.reportPdf({
+                  period: reportPeriod,
                   date: reportDate,
                   cashier: reportCashier,
                   location: reportLocation,
@@ -944,7 +951,7 @@ function Catalog({ cameras, draft, setDraft, onCreate, onUpdate, onToggle, onNot
 }
 
 function Reports({
-  report, loading, error, date, setDate, cashier, setCashier,
+  report, loading, error, date, setDate, period, setPeriod, cashier, setCashier,
   location, setLocation, onLoad, onExport,
 }) {
   useEffect(() => {
@@ -959,11 +966,12 @@ function Reports({
         action={<button className="button button-secondary" onClick={onExport}><FileText size={16} /> Unduh PDF</button>}
       />
       <div className="panel report-filters">
+        <label className="select-filter"><CalendarDays size={15} /><select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="Periode laporan"><option value="daily">Harian</option><option value="weekly">Mingguan</option><option value="monthly">Bulanan</option></select><ChevronDown size={14} /></label>
         <div className="date-filter"><CalendarDays size={15} /><input type="date" value={date} onChange={(event) => setDate(event.target.value)} aria-label="Tanggal laporan" /></div>
         <label className="select-filter"><Users size={15} /><select value={cashier} onChange={(event) => setCashier(event.target.value)} aria-label="Filter kasir"><option value="all">Semua kasir</option><option value="kasir1">Kasir 1</option><option value="kasir2">Kasir 2</option></select><ChevronDown size={14} /></label>
         <label className="select-filter"><Filter size={15} /><select value={location} onChange={(event) => setLocation(event.target.value)} aria-label="Filter lokasi"><option value="all">Semua lokasi</option><option value="cafe">Cafe</option><option value="event">Event</option></select><ChevronDown size={14} /></label>
         <button className="button button-primary button-small" onClick={onLoad} disabled={loading}>{loading ? 'Memuat...' : 'Terapkan filter'}</button>
-        <span className="report-period">{report ? `${report.period.from} — ${report.period.to}` : '7 hari terakhir'}</span>
+        <span className="report-period">{report ? `${report.period.from} — ${report.period.to}` : 'Pilih periode laporan'}</span>
       </div>
       {error && <div className="error-banner"><X size={16} />{error}</div>}
       {loading && !report ? <div className="loading-banner"><span className="loading-spinner" /> Memuat laporan...</div> : report && <>

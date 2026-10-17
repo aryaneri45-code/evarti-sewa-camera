@@ -359,6 +359,32 @@ test('reports are role-scoped and owner can download a PDF summary', async () =>
   assert.equal(defaultSummary.status, 200);
   assert.equal(defaultSummary.body.period.to, date);
   assert.equal(defaultSummary.body.totals.transactionCount, 2);
+  const dailySummary = await owner.agent.get(`/api/reports/summary?period=daily&date=${date}`);
+  assert.equal(dailySummary.status, 200);
+  assert.deepEqual(dailySummary.body.period, { from: date, to: date });
+  const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  const monday = new Date(`${date}T00:00:00.000Z`);
+  monday.setUTCDate(monday.getUTCDate() + (weekday === 0 ? -6 : 1 - weekday));
+  const sunday = new Date(monday);
+  sunday.setUTCDate(sunday.getUTCDate() + 6);
+  const weeklySummary = await owner.agent.get(`/api/reports/summary?period=weekly&date=${date}`);
+  assert.equal(weeklySummary.status, 200);
+  assert.deepEqual(weeklySummary.body.period, {
+    from: monday.toISOString().slice(0, 10),
+    to: sunday.toISOString().slice(0, 10),
+  });
+  const monthlySummary = await owner.agent.get(`/api/reports/summary?period=monthly&date=${date}`);
+  assert.equal(monthlySummary.status, 200);
+  assert.deepEqual(monthlySummary.body.period, {
+    from: `${date.slice(0, 7)}-01`,
+    to: `${date.slice(0, 7)}-${String(new Date(Date.UTC(
+      Number(date.slice(0, 4)),
+      Number(date.slice(5, 7)),
+      0,
+    )).getUTCDate()).padStart(2, '0')}`,
+  });
+  const invalidPeriod = await owner.agent.get(`/api/reports/summary?period=yearly&date=${date}`);
+  assert.equal(invalidPeriod.status, 400);
   const pdf = await owner.agent.get(`/api/reports/summary/pdf?date=${date}`);
   assert.equal(pdf.status, 200);
   assert.match(pdf.headers['content-type'], /application\/pdf/);

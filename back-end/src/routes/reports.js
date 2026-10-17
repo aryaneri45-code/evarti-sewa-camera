@@ -1,26 +1,63 @@
 import PDFDocument from 'pdfkit';
 import { Router } from 'express';
 import { HttpError } from '../utils/errors.js';
-import { jakartaDate, jakartaDateKey } from '../utils/transactions.js';
+import { jakartaDate } from '../utils/transactions.js';
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
-function reportFilters(request) {
-  const conditions = ["date(t.created_at, '+7 hours') >= date(?, '-6 days')"];
-  const today = jakartaDate();
-  const values = [today];
+function isValidDate(value) {
+  if (!datePattern.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
 
-  if (request.query.from || request.query.to || request.query.date) {
+function shiftDate(value, days) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function reportFilters(request) {
+  const today = jakartaDate();
+  let from = shiftDate(today, -6);
+  let to = today;
+
+  if (request.query.period) {
+    if (!['daily', 'weekly', 'monthly'].includes(request.query.period)) {
+      throw new HttpError(400, 'Periode laporan tidak valid.', 'VALIDATION_ERROR');
+    }
+    const anchor = request.query.date || today;
+    if (!isValidDate(anchor)) {
+      throw new HttpError(400, 'Tanggal laporan tidak valid. Gunakan format YYYY-MM-DD.', 'VALIDATION_ERROR');
+    }
+    if (request.query.period === 'daily') {
+      from = anchor;
+      to = anchor;
+    } else if (request.query.period === 'weekly') {
+      const weekday = new Date(`${anchor}T00:00:00.000Z`).getUTCDay();
+      from = shiftDate(anchor, weekday === 0 ? -6 : 1 - weekday);
+      to = shiftDate(from, 6);
+    } else {
+      from = `${anchor.slice(0, 7)}-01`;
+      const nextMonth = new Date(`${from}T00:00:00.000Z`);
+      nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+      to = shiftDate(nextMonth.toISOString().slice(0, 10), -1);
+    }
+  } else if (request.query.from || request.query.to || request.query.date) {
     const from = request.query.from || request.query.date || today;
     const to = request.query.to || request.query.date || from;
-    if (!datePattern.test(from) || !datePattern.test(to) || from > to) {
+    if (!isValidDate(from) || !isValidDate(to) || from > to) {
       throw new HttpError(400, 'Rentang tanggal tidak valid. Gunakan format YYYY-MM-DD.', 'VALIDATION_ERROR');
     }
-    conditions.length = 0;
-    values.length = 0;
-    conditions.push("date(t.created_at, '+7 hours') BETWEEN ? AND ?");
-    values.push(from, to);
+    return buildReportFilters(request, from, to);
   }
+
+  return buildReportFilters(request, from, to);
+}
+
+function buildReportFilters(request, from, to) {
+  const conditions = ["date(t.created_at, '+7 hours') BETWEEN ? AND ?"];
+  const values = [from, to];
   if (request.query.location && request.query.location !== 'all') {
     if (!['cafe', 'event'].includes(request.query.location)) throw new HttpError(400, 'Filter lokasi tidak valid.', 'VALIDATION_ERROR');
     conditions.push('t.location = ?');
@@ -36,7 +73,7 @@ function reportFilters(request) {
     conditions.push('t.cashier_id = ?');
     values.push(request.user.id);
   }
-  return { where: `WHERE ${conditions.join(' AND ')}`, values, from: values[0], to: values[1] };
+  return { where: `WHERE ${conditions.join(' AND ')}`, values, from, to };
 }
 
 export function createReportsRouter({ db }) {
@@ -45,9 +82,6 @@ export function createReportsRouter({ db }) {
   router.get('/summary', (request, response, next) => {
     try {
       const filters = reportFilters(request);
-      const today = jakartaDate();
-      const defaultFromDate = new Date(`${today}T00:00:00.000Z`);
-      defaultFromDate.setUTCDate(defaultFromDate.getUTCDate() - 6);
       const totals = db.prepare(`
         SELECT COUNT(*) AS transaction_count,
           SUM(CASE WHEN t.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_count,
@@ -89,8 +123,8 @@ export function createReportsRouter({ db }) {
       `).all(...filters.values);
       return response.json({
         period: {
-          from: request.query.from || request.query.date || defaultFromDate.toISOString().slice(0, 10),
-          to: request.query.to || request.query.date || today,
+          from: filters.from,
+          to: filters.to,
         },
         totals: {
           transactionCount: totals.transaction_count || 0,
@@ -149,7 +183,7 @@ export function createReportsRouter({ db }) {
       doc.pipe(response);
       doc.fontSize(22).text('Evarti Rental', { continued: false });
       doc.moveDown(0.4).fontSize(11).fillColor('#695b61').text('Ringkasan Transaksi');
-      doc.moveDown(0.3).text(`Periode: ${request.query.from || request.query.date || '7 hari terakhir'} s/d ${request.query.to || request.query.date || jakartaDate()}`);
+      doc.moveDown(0.3).text(`Periode: ${filters.from} s/d ${filters.to}`);
       if (request.query.location && request.query.location !== 'all') doc.text(`Lokasi: ${request.query.location === 'cafe' ? 'Cafe' : 'Event'}`);
       if (request.query.cashier && request.query.cashier !== 'all') doc.text(`Kasir: ${request.query.cashier}`);
       doc.moveDown().fillColor('#352d31').fontSize(13).text(`Jumlah transaksi: ${summary.transaction_count || 0}`);
