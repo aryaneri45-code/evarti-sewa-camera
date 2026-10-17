@@ -1,165 +1,177 @@
-# Evarti Rental
+# Evarti Camera Rental
 
-Aplikasi web internal untuk membantu tim Evarti mengelola penyewaan kamera,
-mencatat transaksi, membuat dan mencetak struk, serta memantau laporan usaha.
-Antarmuka dibuat responsif agar dapat digunakan dari ponsel, tablet, maupun
-desktop.
+Evarti Camera Rental is an internal, responsive web app for managing camera
+rentals at Evarti's Cafe and Event locations. It gives the owner and cashiers a
+single place to create rental transactions, calculate charges, print thermal
+receipts, and review transaction history. The interface is designed for phones,
+tablets, and desktop screens.
 
-## Fitur
+This is an operations tool for Evarti staff, not a public customer booking
+website. Customers do not book or pay through the site.
 
-- Login dengan peran **Owner**, **Kasir 1**, dan **Kasir 2**.
-- Katalog kamera dengan harga sewa 1 jam dan 2 jam; Owner dapat mengelola
-  kamera, harga, foto, dan status aktif.
-- Pembuatan transaksi dengan satu atau lebih kamera; durasi dan tarif dapat
-  diatur per kamera, lalu dijumlahkan dalam satu pembayaran dan struk.
-- Data penyewa, nomor WhatsApp, nomor pager opsional sebagai pengingat waktu
-  sewa, lokasi, metode pembayaran, dan informasi jaminan opsional.
-- Tarif dan durasi manual untuk penyewaan lebih dari 2 jam.
-- Pratinjau, penyimpanan, cetak, dan cetak ulang struk thermal 58 mm.
-- Pilihan cetak struk Admin (format `NEW ORDER`) atau struk Pelanggan, masing-masing dengan tampilan cetak tersendiri.
-- Nomor pager yang dimasukkan ikut tersimpan dan dicetak pada struk.
-- Riwayat transaksi dengan akses sesuai peran, serta fitur verifikasi
-  pembayaran, pembatalan (void), dan pencatatan audit untuk aksi penting.
-- Dashboard dan laporan Owner dengan periode harian, mingguan, atau bulanan;
-  ringkasan dapat diunduh dalam PDF.
-- Foto kamera dan foto jaminan disimpan melalui API, dengan foto jaminan
-  bersifat privat.
+## What it does
 
-**Catatan pembayaran QRIS:** verifikasi pembayaran QRIS dilakukan secara
-manual. Aset QRIS resmi DANA belum disertakan, sehingga aplikasi tidak
-menampilkan atau membuat QR pembayaran palsu.
+- **Role-based staff access:** Owner, Cashier 1, and Cashier 2 sign in with
+  separate accounts. Cashier 1 is assigned to Cafe, Cashier 2 to Event, and the
+  owner can choose a location.
+- **Camera catalog:** Owners can add, edit, deactivate, reactivate, and delete
+  cameras, update their one- and two-hour rental prices, and upload camera
+  photos. Cashiers see active products only.
+- **Rental transactions:** Create a receipt with one or more cameras, individual
+  rental durations, and manual pricing for rentals longer than two hours. The
+  app calculates end times, totals, cash change, and validates prices on the
+  server.
+- **Add-on catalog:** Select optional property items, photographer packages,
+  photo prints, and file-transfer methods. Owners can change add-on names and
+  prices, deactivate options, add new options, or delete them. File-transfer
+  options are initially free.
+- **Receipts:** Preview, print, and reprint customer receipts on 58 mm thermal
+  paper, or print an admin order copy. Selected add-ons and their prices appear
+  on the receipt.
+- **Transaction history:** Cashiers can access their own transactions; owners
+  can review all transactions, verify QRIS payments, void transactions, and
+  review business reports.
+- **Reports:** Owners can view daily, weekly, and monthly summaries and download
+  a PDF report.
+- **Data snapshots:** Product names and prices are saved with each transaction,
+  so later catalog edits or deletions do not change existing receipts.
 
-## Teknologi
+### QRIS payments
 
-- **Frontend:** React 18 dan Vite
-- **Backend:** Node.js, Express, dan SQLite
-- **Pengujian API:** Node.js Test Runner dan Supertest
+QRIS payments are recorded and verified manually. An official DANA QR asset is
+not included, so the app does not generate or display a fake payment QR code.
 
-## Persyaratan
+## Technology
 
-- Node.js **20 atau lebih baru**
+- **Frontend:** React 18, Vite, and Lucide icons
+- **Backend:** Node.js, Express, and SQLite (`better-sqlite3`)
+- **Validation:** Zod
+- **API tests:** Node.js Test Runner and Supertest
+
+## Requirements
+
+- Node.js 20 or newer
 - npm
 
-## Menjalankan secara lokal
+## Run locally
 
-Jalankan perintah berikut dari direktori utama repositori:
+From the repository root, create the backend environment file:
 
 ```sh
 cp back-end/.env.example .env
 ```
 
-Sebelum menjalankan aplikasi, edit `.env`:
+Edit `.env` before starting the app:
 
-- Ganti `SESSION_SECRET` dengan nilai acak minimal 32 karakter. Contoh untuk
-  membuat nilai:
+- Set `SESSION_SECRET` to a random value of at least 32 characters. For example:
 
   ```sh
   openssl rand -base64 48
   ```
 
-- Ganti `OWNER_PASSWORD`, `CASHIER1_PASSWORD`, dan `CASHIER2_PASSWORD` dengan
-  password berbeda yang masing-masing minimal 12 karakter.
-- Jangan unggah atau commit file `.env` ke GitHub.
+- Set unique passwords of at least 12 characters for `OWNER_PASSWORD`,
+  `CASHIER1_PASSWORD`, and `CASHIER2_PASSWORD`.
+- Do not commit `.env` or share its contents.
 
-Kemudian pasang dependensi dan jalankan frontend bersama API:
+Install dependencies and start both the API and frontend:
 
 ```sh
 npm install
 npm run dev
 ```
 
-Buka alamat frontend yang ditampilkan Vite (secara default
-`http://localhost:5173`). API berjalan pada `http://localhost:3000`; frontend
-mengakses API melalui proxy Vite.
+Open the frontend URL shown by Vite (usually
+[`http://localhost:5173`](http://localhost:5173)). The API runs at
+[`http://localhost:3000`](http://localhost:3000), and Vite proxies frontend API
+requests to it.
 
-Pada peluncuran pertama, backend membuat database SQLite dan menyiapkan akun
-serta katalog kamera awal. Gunakan username berikut dan password yang sudah
-diatur pada `.env`:
+The initial login usernames are:
 
-| Peran | Username | Variabel password |
+| Role | Username | Password environment variable |
 |---|---|---|
 | Owner | `owner` | `OWNER_PASSWORD` |
-| Kasir 1 | `kasir1` | `CASHIER1_PASSWORD` |
-| Kasir 2 | `kasir2` | `CASHIER2_PASSWORD` |
+| Cashier 1 | `kasir1` | `CASHIER1_PASSWORD` |
+| Cashier 2 | `kasir2` | `CASHIER2_PASSWORD` |
 
-Lokasi transaksi Kasir 1 ditetapkan oleh server ke Cafe, sedangkan Kasir 2 ke
-Event. Owner dapat memilih lokasi transaksi. Mengubah variabel password setelah
-database dibuat tidak mengganti password yang sudah tersimpan.
+The backend creates its SQLite database and seeds the initial camera and
+add-on catalogs on first launch. Changing password variables after the
+database has been initialized does not change existing account passwords.
 
-### Menjalankan bagian aplikasi secara terpisah
+### Run frontend and backend separately
+
+Run these commands in separate terminals from the repository root:
 
 ```sh
 npm run dev:backend
 npm run dev:frontend
 ```
 
-Jalankan setiap perintah pada terminal terpisah. Frontend development server
-menggunakan proxy API ke `http://localhost:3000`.
+The frontend development server proxies API calls to `http://localhost:3000`.
+Set `VITE_API_URL` in `Front-end/.env` only when the API is hosted on a
+different origin.
 
-## Pengujian dan build
+## Tests and production build
 
-Jalankan pengujian backend dari direktori utama:
+Run the backend API tests:
 
 ```sh
 npm test
 ```
 
-Buat build produksi frontend:
+Build the frontend:
 
 ```sh
 npm run build
 ```
 
-## Konfigurasi
+## Configuration
 
-Konfigurasi backend dibaca dari `.env` di direktori utama (atau dari
-`back-end/.env` jika file root tidak tersedia).
+The backend reads `.env` from the repository root, or from `back-end/.env` if a
+root `.env` is not present.
 
-| Variabel | Fungsi | Nilai default |
+| Variable | Purpose | Default |
 |---|---|---|
-| `NODE_ENV` | Mode aplikasi | `development` |
-| `PORT` | Port API | `3000` |
-| `DATABASE_PATH` | Lokasi file database SQLite | `./.data/evarti.sqlite` |
-| `SESSION_SECRET` | Secret sesi acak, minimal 32 karakter | Wajib diisi |
-| `FRONTEND_ORIGIN` | Origin frontend yang diizinkan; pisahkan beberapa origin dengan koma | `http://localhost:5173` |
-| `COOKIE_SECURE` | Kirim cookie sesi hanya melalui HTTPS | `false` |
-| `OWNER_PASSWORD` | Password awal Owner | Wajib diisi |
-| `CASHIER1_PASSWORD` | Password awal Kasir 1 | Wajib diisi |
-| `CASHIER2_PASSWORD` | Password awal Kasir 2 | Wajib diisi |
+| `NODE_ENV` | Runtime mode | `development` |
+| `PORT` | API port | `3000` |
+| `DATABASE_PATH` | SQLite database file | `./.data/evarti.sqlite` |
+| `SESSION_SECRET` | Random session secret, at least 32 characters | Required |
+| `FRONTEND_ORIGIN` | Allowed frontend origin(s), comma-separated | `http://localhost:5173` |
+| `COOKIE_SECURE` | Send session cookies only over HTTPS | `false` |
+| `OWNER_PASSWORD` | Initial owner password | Required |
+| `CASHIER1_PASSWORD` | Initial Cashier 1 password | Required |
+| `CASHIER2_PASSWORD` | Initial Cashier 2 password | Required |
 
-Untuk production, gunakan HTTPS, set `NODE_ENV=production` dan
-`COOKIE_SECURE=true`, gunakan secret serta password yang kuat, dan sesuaikan
-`FRONTEND_ORIGIN` dengan domain frontend.
+For production, use HTTPS, set `NODE_ENV=production` and `COOKIE_SECURE=true`,
+use strong credentials and a random session secret, and set `FRONTEND_ORIGIN`
+to the deployed frontend domain. If the frontend and API use different origins,
+set `VITE_API_URL` in `Front-end/.env` and allow the frontend origin in the
+backend configuration.
 
-Frontend menggunakan origin API yang sama secara default. Jika API ditempatkan
-pada origin terpisah, atur `VITE_API_URL` di `Front-end/.env` dan izinkan origin
-frontend tersebut melalui `FRONTEND_ORIGIN` backend.
-
-## Struktur proyek
+## Project structure
 
 ```text
 .
 ├── Front-end/
-│   ├── src/
-│   │   ├── services/       # Klien API
-│   │   ├── App.jsx         # Antarmuka aplikasi
-│   │   └── styles.css
-│   └── vite.config.js
+│   ├── public/evarti-logo.png
+│   └── src/
+│       ├── services/api.js
+│       ├── App.jsx
+│       └── styles.css
 ├── back-end/
 │   ├── src/
-│   │   ├── config/         # Konfigurasi environment
-│   │   ├── middleware/     # Autentikasi, CSRF, dan upload
-│   │   ├── routes/         # Endpoint API
+│   │   ├── config/
+│   │   ├── middleware/
+│   │   ├── routes/
 │   │   ├── utils/
 │   │   ├── app.js
 │   │   ├── db.js
 │   │   └── server.js
-│   ├── tests/
-│   └── uploads/            # Unggahan kamera dan file privat
-├── PRD-everti.md
+│   └── tests/
+├── PRD-evarti.md
+├── README-hosting.md
 ├── package.json
 └── README.md
 ```
 
-Database dan file upload lokal merupakan data operasional; siapkan penyimpanan
-dan pencadangan yang sesuai sebelum deployment.
+The SQLite database and uploaded files contain operational data. Back them up
+appropriately before deploying or moving the application.
