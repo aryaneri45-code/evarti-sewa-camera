@@ -84,15 +84,18 @@ All responses use JSON unless noted; errors are returned as
 | `GET` | `/api/reports/summary/pdf` | Owner | Download summary PDF |
 | `GET` | `/api/audit-logs` | Owner | Recent sensitive-action audit logs |
 
-Transaction creation expects `customerName`, `customerWhatsapp`, `cameraId`,
-`durationLabel`, `durationMinutes`, `startTime`, `endTime`, `price`,
-`isManualPrice`, `total`, and `paymentMethod`; `location` is required for Owner
-but ignored and assigned by the server for cashiers. Cash payments also require
-`amountReceived`. For manual duration, set `isManualPrice: true` and provide a
-positive manual `price` and `total`; duration must exceed 120 minutes. The API
-rechecks catalogue prices for one- and two-hour rentals and normalizes WhatsApp
-numbers before saving. `customerPagerNumber` is optional; when provided, it is
-saved with the transaction and included in the receipt.
+Transaction creation expects `customerName`, `customerWhatsapp`, `startTime`,
+`endTime`, `total`, and `paymentMethod`; `location` is required for Owner but
+ignored and assigned by the server for cashiers. Send `items` as an array with
+one entry per camera: `cameraId`, `durationMinutes`, `price`, and
+`isManualPrice`, plus optional `manualNote`. Each item can have its own
+duration and price. Catalogue prices are rechecked for one- and two-hour
+rentals; manual prices are allowed only for durations above two hours. The
+transaction end time must match the longest item duration, and the API sums
+the item prices to validate `total`. Cash payments also require
+`amountReceived`. WhatsApp numbers are normalized before saving.
+`customerPagerNumber` is optional; when provided, it is saved with the
+transaction and included in the receipt.
 
 For a guarantee photo, send `multipart/form-data` with a JSON string in the
 `payload` field plus an optional `guaranteePhoto` file. The JSON must set
@@ -112,6 +115,6 @@ Reports accept `from` and `to` dates, or a single `date`.
 npm test
 ```
 
-Tests use in-memory SQLite databases and temporary upload directories. This API
-is not yet connected to the frontend; configure the frontend API client to use
-the endpoints above and send credentials plus the CSRF header before deploying.
+Tests use in-memory SQLite databases and temporary upload directories. The
+frontend uses the API client in `Front-end/src/services/api.js`, including
+session credentials and the CSRF header for state-changing requests.

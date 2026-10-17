@@ -10,9 +10,10 @@ desktop.
 - Login dengan peran **Owner**, **Kasir 1**, dan **Kasir 2**.
 - Katalog kamera dengan harga sewa 1 jam dan 2 jam; Owner dapat mengelola
   kamera, harga, foto, dan status aktif.
-- Pembuatan transaksi dengan data penyewa, nomor WhatsApp, durasi, lokasi,
-  nomor pager opsional sebagai pengingat waktu sewa, metode pembayaran, dan
-  informasi jaminan opsional.
+- Pembuatan transaksi dengan satu atau lebih kamera; durasi dan tarif dapat
+  diatur per kamera, lalu dijumlahkan dalam satu pembayaran dan struk.
+- Data penyewa, nomor WhatsApp, nomor pager opsional sebagai pengingat waktu
+  sewa, lokasi, metode pembayaran, dan informasi jaminan opsional.
 - Tarif dan durasi manual untuk penyewaan lebih dari 2 jam.
 - Pratinjau, penyimpanan, cetak, dan cetak ulang struk thermal 58 mm.
 - Nomor pager yang dimasukkan ikut tersimpan dan dicetak pada struk.

@@ -133,6 +133,49 @@ test('cashier location is enforced by role and cashier data is isolated', async 
   assert.equal((await cashierOne.agent.get('/api/cameras')).body.cameras.length, 6);
 });
 
+test('one transaction can include multiple cameras with independent durations and summed prices', async () => {
+  const app = makeApp();
+  const cashier = await login(app, 'kasir1');
+  const created = await cashier.agent.post('/api/transactions')
+    .set('X-CSRF-Token', cashier.csrfToken)
+    .send(rentalPayload({
+      items: [
+        { cameraId: 'casio', durationMinutes: 120, price: 15000, isManualPrice: false },
+        { cameraId: 'olympus-tough-8010', durationMinutes: 60, price: 15000, isManualPrice: false },
+      ],
+      durationMinutes: 120,
+      durationLabel: '2 Jam',
+      endTime: '12:00',
+      price: 30000,
+      total: 30000,
+      amountReceived: 50000,
+    }));
+
+  assert.equal(created.status, 201);
+  assert.equal(created.body.transaction.total, 30000);
+  assert.equal(created.body.transaction.endTime, '12:00');
+  assert.deepEqual(created.body.transaction.items.map(({ cameraId, durationLabel, price }) => ({
+    cameraId,
+    durationLabel,
+    price,
+  })), [
+    { cameraId: 'casio', durationLabel: '2 Jam', price: 15000 },
+    { cameraId: 'olympus-tough-8010', durationLabel: '1 Jam', price: 15000 },
+  ]);
+
+  const history = await cashier.agent.get('/api/transactions');
+  assert.equal(history.body.transactions[0].items.length, 2);
+  const report = await cashier.agent.get('/api/reports/summary');
+  assert.deepEqual(report.body.popularCameras.map(({ cameraId, rentalCount, revenue }) => ({
+    cameraId,
+    rentalCount,
+    revenue,
+  })).sort((a, b) => a.cameraId.localeCompare(b.cameraId)), [
+    { cameraId: 'casio', rentalCount: 1, revenue: 15000 },
+    { cameraId: 'olympus-tough-8010', rentalCount: 1, revenue: 15000 },
+  ]);
+});
+
 test('pager number is optional and limited to 40 characters', async () => {
   const app = makeApp();
   const cashier = await login(app, 'kasir1');

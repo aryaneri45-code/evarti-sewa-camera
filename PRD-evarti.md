@@ -160,7 +160,7 @@ Struk mengikuti desain yang sudah ditetapkan (lihat gambar referensi). Layout be
             evarti
  Weaving stories into your life
 --------------------------------
-No. Struk      EVT-20261017-001
+No. Struk        EVT-20261017-001
 Tanggal                17/10/2026
 Jam Mulai                  06:40
 Jam Selesai                08:40
@@ -168,14 +168,15 @@ Penyewa                    aryan
 No. WA               081234567890
 No. Pager                  P-07
 --------------------------------
-Kamera                     Casio
-Durasi                     2 Jam
-Harga                  Rp 15.000
+Casio
+2 Jam                   Rp 15.000
+canon ixus 285
+1 jam                   Rp 15.000
 --------------------------------
-TOTAL                  Rp 15.000
+TOTAL                  Rp 30.000
 Bayar                      Tunai
-Diterima               Rp 15.000
-Kembali                     Rp 0
+Diterima               Rp 50.000
+Kembali                Rp 20.000
 --------------------------------
  Keterlambatan dikenakan denda.
  Kerusakan/kehilangan menjadi

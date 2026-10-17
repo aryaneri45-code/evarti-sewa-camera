@@ -149,9 +149,15 @@ function Receipt({ transaction }) {
       <div className="receipt-row"><span>No. WA</span><b>{transaction.customerWhatsapp || '08xxxxxxxxxx'}</b></div>
       {transaction.customerPagerNumber && <div className="receipt-row"><span>No. Pager</span><b>{transaction.customerPagerNumber}</b></div>}
       <div className="receipt-rule" />
-      <div className="receipt-row"><span>Kamera</span><b>{transaction.cameraName || 'Pilih kamera'}</b></div>
-      <div className="receipt-row"><span>Durasi</span><b>{transaction.durationLabel}</b></div>
-      <div className="receipt-row"><span>Harga</span><b>{transaction.isManualPrice ? 'Tarif Manual' : currency(transaction.total)}</b></div>
+      {(transaction.items?.length ? transaction.items : [{
+        cameraName: transaction.cameraName || 'Pilih kamera',
+        durationLabel: transaction.durationLabel,
+        price: transaction.total,
+        isManualPrice: transaction.isManualPrice,
+      }]).map((item, index) => <React.Fragment key={`${item.cameraId || item.cameraName}-${index}`}>
+        <div className="receipt-item-name">{item.cameraName}</div>
+        <div className="receipt-row"><span>{item.durationLabel}{item.isManualPrice ? ' · Tarif Manual' : ''}</span><b>{currency(item.price)}</b></div>
+      </React.Fragment>)}
       <div className="receipt-rule" />
       <div className="receipt-row receipt-total"><span>TOTAL</span><b>{currency(transaction.total)}</b></div>
       <div className="receipt-row"><span>Bayar</span><b>{transaction.paymentMethod === 'qris_dana' ? 'QRIS DANA' : 'Tunai'}</b></div>
@@ -434,10 +440,11 @@ function PageHeading({ eyebrow, title, description, action }) {
 function Dashboard({ user, transactions, todayTransactions, revenueToday, onNavigate, onPrint }) {
   const todayPaid = todayTransactions.filter((transaction) => transaction.paymentStatus === 'paid');
   const newest = [...transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
-  const popular = Object.values(todayPaid.reduce((all, transaction) => {
-    all[transaction.cameraName] = (all[transaction.cameraName] || 0) + 1;
-    return all;
-  }, {})).length;
+  const popular = new Set(todayPaid.flatMap((transaction) =>
+    (transaction.items || [{ cameraName: transaction.cameraName }]).map((item) => item.cameraName),
+  )).size;
+  const cameraSummary = (transaction) => (transaction.items || [{ cameraName: transaction.cameraName }])
+    .map((item) => item.cameraName).join(', ');
   return (
     <>
       <PageHeading eyebrow={`SELAMAT PAGI, ${user.name.split(' ')[0].toUpperCase()}`} title="Ruang cerita hari ini." description="Semua yang perlu kamu tahu, dalam satu tempat." action={<button className="button button-primary" onClick={() => onNavigate('create')}><Plus size={17} /> Buat struk baru</button>} />
@@ -456,7 +463,7 @@ function Dashboard({ user, transactions, todayTransactions, revenueToday, onNavi
         <div className="panel recent-panel">
           <div className="panel-heading"><div><h2>Transaksi terbaru</h2><p>Aktivitas penyewaan terakhir</p></div><button className="text-button" onClick={() => onNavigate('history')}>Lihat semua <ArrowRight size={15} /></button></div>
           {newest.length === 0 ? <EmptyState title="Belum ada transaksi" body="Transaksi yang dibuat akan muncul di sini." /> : <div className="table-wrap"><table><thead><tr><th>No. struk</th><th>Penyewa</th><th>Kamera</th><th>Total</th><th>Status</th><th /></tr></thead><tbody>
-            {newest.map((transaction) => <tr key={transaction.id}><td><strong className="receipt-id">{transaction.receiptNo}</strong><small>{formatDate(transaction.createdAt)}</small></td><td>{transaction.customerName}<small>{transaction.location === 'cafe' ? 'Cafe' : 'Event'}</small></td><td>{transaction.cameraName}</td><td className="money-cell">{formatCurrency(transaction.total)}</td><td><StatusBadge transaction={transaction} /></td><td><button className="table-icon-button" onClick={() => onPrint(transaction)} aria-label="Cetak struk"><Printer size={16} /></button></td></tr>)}
+            {newest.map((transaction) => <tr key={transaction.id}><td><strong className="receipt-id">{transaction.receiptNo}</strong><small>{formatDate(transaction.createdAt)}</small></td><td>{transaction.customerName}<small>{transaction.location === 'cafe' ? 'Cafe' : 'Event'}</small></td><td>{cameraSummary(transaction)}</td><td className="money-cell">{formatCurrency(transaction.total)}</td><td><StatusBadge transaction={transaction} /></td><td><button className="table-icon-button" onClick={() => onPrint(transaction)} aria-label="Cetak struk"><Printer size={16} /></button></td></tr>)}
           </tbody></table></div>}
         </div>
         <div className="panel quick-panel"><div className="panel-heading"><div><h2>Akses cepat</h2><p>Yang sering kamu butuhkan</p></div><SlidersHorizontal size={17} className="muted-icon" /></div>
@@ -492,24 +499,60 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
   const [guaranteeImage, setGuaranteeImage] = useState('');
   const [guaranteePhotoFile, setGuaranteePhotoFile] = useState(null);
   const [guaranteeError, setGuaranteeError] = useState('');
-  const [selectedCamera, setSelectedCamera] = useState('');
-  const [duration, setDuration] = useState('1');
-  const [manualHours, setManualHours] = useState('');
-  const [manualMinutes, setManualMinutes] = useState('');
-  const [manualPrice, setManualPrice] = useState('');
-  const [manualNote, setManualNote] = useState('');
+  const [selectedCameraIds, setSelectedCameraIds] = useState([]);
+  const [cameraSettings, setCameraSettings] = useState({});
   const [startTime, setStartTime] = useState(currentTime);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountReceived, setAmountReceived] = useState('');
   const [errors, setErrors] = useState({});
   const [activeTransaction, setActiveTransaction] = useState(null);
   const [savedHere, setSavedHere] = useState(false);
-  const selected = cameras.find((camera) => camera.id === selectedCamera);
-  const durationMinutes = duration === 'manual' ? Number(manualHours || 0) * 60 + Number(manualMinutes || 0) : Number(duration) * 60;
+  const selectedItems = selectedCameraIds.flatMap((cameraId) => {
+    const camera = cameras.find((entry) => entry.id === cameraId);
+    if (!camera) return [];
+    const settings = cameraSettings[cameraId] || { duration: '1', manualHours: '', manualMinutes: '', manualPrice: '', manualNote: '' };
+    const isManualPrice = settings.duration === 'manual';
+    const durationMinutes = isManualPrice
+      ? Number(settings.manualHours || 0) * 60 + Number(settings.manualMinutes || 0)
+      : Number(settings.duration) * 60;
+    const price = isManualPrice ? Number(settings.manualPrice) || 0 : Number(camera.prices[settings.duration]) || 0;
+    const durationHours = Math.floor(durationMinutes / 60);
+    const durationRemainder = durationMinutes % 60;
+    const durationLabel = isManualPrice
+      ? `${durationHours} Jam${durationRemainder ? ` ${durationRemainder} mnt` : ''}`
+      : `${settings.duration} Jam`;
+    return [{
+      camera,
+      cameraId,
+      cameraName: camera.name,
+      duration: settings.duration,
+      durationMinutes,
+      durationLabel,
+      price,
+      isManualPrice,
+      manualNote: settings.manualNote || '',
+    }];
+  });
+  const durationMinutes = selectedItems.length ? Math.max(...selectedItems.map((item) => item.durationMinutes)) : 0;
   const endTime = calcEndTime(startTime, durationMinutes);
-  const total = duration === 'manual' ? Number(manualPrice) || 0 : Number(selected?.prices?.[duration]) || 0;
+  const total = selectedItems.reduce((sum, item) => sum + item.price, 0);
   const normalizedWhatsapp = normalizeWhatsapp(whatsapp);
   const change = Math.max(0, Number(amountReceived) - total);
+  const updateCameraSettings = (cameraId, key, value) => {
+    setCameraSettings((previous) => ({
+      ...previous,
+      [cameraId]: {
+        ...(previous[cameraId] || { duration: '1', manualHours: '', manualMinutes: '', manualPrice: '', manualNote: '' }),
+        [key]: value,
+      },
+    }));
+  };
+  const toggleCamera = (cameraId) => {
+    setSelectedCameraIds((previous) => previous.includes(cameraId)
+      ? previous.filter((id) => id !== cameraId)
+      : [...previous, cameraId]);
+    setErrors((previous) => ({ ...previous, camera: '' }));
+  };
   const preview = activeTransaction || {
     receiptNo: `${activeLocation === 'event' ? 'EVT' : 'CAF'}-YYYYMMDD-000`,
     createdAt: new Date().toISOString(),
@@ -518,10 +561,19 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
     customerName,
     customerWhatsapp: normalizedWhatsapp || whatsapp || '',
     customerPagerNumber: pagerNumber.trim(),
-    cameraName: selected?.name || '',
-    durationLabel: duration === 'manual' ? `${manualHours || 0} jam ${manualMinutes || 0} mnt` : `${duration} Jam`,
+    cameraName: selectedItems[0]?.cameraName || '',
+    durationLabel: selectedItems[0]?.durationLabel || '',
+    items: selectedItems.map((item) => ({
+      cameraId: item.cameraId,
+      cameraName: item.cameraName,
+      durationLabel: item.durationLabel,
+      durationMinutes: item.durationMinutes,
+      price: item.price,
+      isManualPrice: item.isManualPrice,
+      manualNote: item.manualNote,
+    })),
     total,
-    isManualPrice: duration === 'manual',
+    isManualPrice: selectedItems.some((item) => item.isManualPrice),
     paymentMethod,
     amountReceived: Number(amountReceived) || 0,
     change,
@@ -532,7 +584,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
   useEffect(() => {
     setSavedHere(false);
     setActiveTransaction(null);
-  }, [activeLocation, customerName, whatsapp, pagerNumber, guaranteeType, guaranteeId, guaranteeImage, guaranteePhotoFile, selectedCamera, duration, manualHours, manualMinutes, manualPrice, manualNote, startTime, paymentMethod, amountReceived]);
+  }, [activeLocation, customerName, whatsapp, pagerNumber, guaranteeType, guaranteeId, guaranteeImage, guaranteePhotoFile, selectedCameraIds, cameraSettings, startTime, paymentMethod, amountReceived]);
 
   const fieldError = (name, message) => <div className="field-error">{message || errors[name]}</div>;
   const validate = () => {
@@ -540,14 +592,17 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
     if (!customerName.trim()) nextErrors.customerName = 'Nama penyewa wajib diisi.';
     if (!whatsapp.trim()) nextErrors.whatsapp = 'No. WhatsApp wajib diisi.';
     else if (!normalizedWhatsapp) nextErrors.whatsapp = 'Format nomor tidak valid. Gunakan 08, 62, atau +62 (9–15 digit).';
-    if (!selected) nextErrors.camera = 'Pilih kamera yang akan disewa.';
-    if (duration === 'manual' && (
-      !Number.isInteger(Number(manualHours || 0)) || Number(manualHours || 0) < 0 ||
-      !Number.isInteger(Number(manualMinutes || 0)) || Number(manualMinutes || 0) < 0 ||
-      Number(manualMinutes || 0) > 59 || durationMinutes <= 120
-    )) nextErrors.manualDuration = 'Isi durasi lebih dari 2 jam. Jam harus bilangan bulat dan menit antara 0–59.';
-    if (duration === 'manual' && !(Number(manualPrice) > 0)) nextErrors.manualPrice = 'Isi tarif manual lebih dari Rp 0.';
-    if (!durationMinutes) nextErrors.duration = 'Pilih durasi sewa.';
+    if (selectedItems.length === 0) nextErrors.camera = 'Pilih minimal satu kamera yang akan disewa.';
+    if (selectedItems.length > 20) nextErrors.camera = 'Maksimal 20 kamera dapat dimasukkan dalam satu transaksi.';
+    for (const item of selectedItems) {
+      if (item.isManualPrice && (
+        !Number.isInteger(Number(cameraSettings[item.cameraId]?.manualHours || 0)) || Number(cameraSettings[item.cameraId]?.manualHours || 0) < 0 ||
+        !Number.isInteger(Number(cameraSettings[item.cameraId]?.manualMinutes || 0)) || Number(cameraSettings[item.cameraId]?.manualMinutes || 0) < 0 ||
+        Number(cameraSettings[item.cameraId]?.manualMinutes || 0) > 59 || item.durationMinutes <= 120
+      )) nextErrors[`duration-${item.cameraId}`] = 'Isi durasi manual lebih dari 2 jam.';
+      if (item.isManualPrice && !(item.price > 0)) nextErrors[`price-${item.cameraId}`] = 'Isi tarif manual lebih dari Rp 0.';
+    }
+    if (selectedItems.some((item) => item.durationMinutes <= 0)) nextErrors.camera = 'Isi durasi untuk semua kamera yang dipilih.';
     if (!startTime || !endTime || durationMinutes <= 0) nextErrors.time = 'Jam mulai dan durasi harus menghasilkan jam selesai.';
     if (paymentMethod === 'cash' && Number(amountReceived) < total) nextErrors.amountReceived = 'Uang diterima tidak boleh kurang dari total.';
     if (guaranteeType === 'id_number' && !guaranteeId.trim()) nextErrors.guaranteeId = 'Nomor ID wajib diisi jika jaminan dipilih.';
@@ -562,6 +617,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       onNotice('Periksa kembali data transaksi yang wajib diisi.');
       return;
     }
+    const firstItem = selectedItems[0];
     const payload = {
       location: activeLocation,
       customerName: customerName.trim(),
@@ -569,14 +625,21 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       customerPagerNumber: pagerNumber.trim(),
       guaranteeType,
       guaranteeIdNumber: guaranteeType === 'id_number' ? guaranteeId.trim() : null,
-      cameraId: selected.id,
-      durationLabel: duration === 'manual' ? `${manualHours} jam ${manualMinutes || 0} mnt` : `${duration} Jam`,
+      cameraId: firstItem.cameraId,
+      items: selectedItems.map((item) => ({
+        cameraId: item.cameraId,
+        durationMinutes: item.durationMinutes,
+        price: item.price,
+        isManualPrice: item.isManualPrice,
+        manualNote: item.manualNote.trim(),
+      })),
+      durationLabel: firstItem.durationLabel,
       durationMinutes,
       startTime,
       endTime,
       price: total,
-      isManualPrice: duration === 'manual',
-      manualNote: duration === 'manual' ? manualNote.trim() : '',
+      isManualPrice: selectedItems.some((item) => item.isManualPrice),
+      manualNote: selectedItems.find((item) => item.isManualPrice)?.manualNote.trim() || '',
       total,
       paymentMethod,
       amountReceived: paymentMethod === 'cash' ? Number(amountReceived) : total,
@@ -651,22 +714,29 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
             <div className="privacy-note"><ShieldCheck size={15} /><span>Data jaminan hanya dapat dilihat oleh Owner dan kasir yang membuat transaksi. Tidak dicetak di struk.</span></div>
           </section>
           <section className="form-section">
-            <SectionTitle number="02" title="Pilih kamera" subtitle="Pilih kamera yang akan disewa" />
+            <SectionTitle number="02" title="Pilih kamera" subtitle="Pilih satu atau lebih kamera yang akan disewa" />
             {errors.camera && fieldError('camera')}
             {cameras.length === 0 ? <EmptyState title="Katalog belum tersedia" body="Belum ada kamera aktif di katalog." /> : <div className="camera-grid">
-              {cameras.map((camera) => <button type="button" className={`camera-option ${selectedCamera === camera.id ? 'camera-option-selected' : ''}`} key={camera.id} onClick={() => setSelectedCamera(camera.id)}><div className="camera-option-visual"><CameraArtwork tone={camera.tone} image={camera.image} /><span className="camera-select-check"><Check size={13} /></span></div><div className="camera-option-info"><strong>{camera.name}</strong><span>{formatCurrency(camera.prices[1])} <small>/ jam</small></span></div></button>)}
+              {cameras.map((camera) => <button type="button" aria-pressed={selectedCameraIds.includes(camera.id)} className={`camera-option ${selectedCameraIds.includes(camera.id) ? 'camera-option-selected' : ''}`} key={camera.id} onClick={() => toggleCamera(camera.id)}><div className="camera-option-visual"><CameraArtwork tone={camera.tone} image={camera.image} /><span className="camera-select-check"><Check size={13} /></span></div><div className="camera-option-info"><strong>{camera.name}</strong><span>{formatCurrency(camera.prices[1])} <small>/ jam</small></span></div></button>)}
             </div>}
           </section>
           <section className="form-section">
-            <SectionTitle number="03" title="Durasi & pembayaran" subtitle="Atur waktu dan metode pembayaran" />
-            <div className="duration-options">
-              {[['1', '1 jam', 'Tarif katalog'], ['2', '2 jam', 'Tarif katalog'], ['manual', 'Lebih dari 2 jam', 'Tarif manual']].map(([value, title, desc]) => <button type="button" key={value} onClick={() => setDuration(value)} className={`duration-card ${duration === value ? 'duration-selected' : ''}`}><span className="duration-check">{duration === value && <Check size={12} />}</span><strong>{title}</strong><small>{desc}</small></button>)}
-            </div>
-            {duration === 'manual' && <div className="manual-price-panel"><div className="manual-info"><Sparkles size={16} /><span><strong>Tarif diisi manual</strong><small>Sistem tidak menghitung tarif untuk durasi di atas 2 jam.</small></span></div><div className="form-grid">
-              <div className="form-field"><label className="field-label">Durasi <span>*</span></label><div className="duration-inputs"><div><input className="text-input" type="number" min="0" max="24" value={manualHours} onChange={(event) => setManualHours(event.target.value)} placeholder="3" /><span>Jam</span></div><div><input className="text-input" type="number" min="0" max="59" value={manualMinutes} onChange={(event) => setManualMinutes(event.target.value)} placeholder="00" /><span>Menit</span></div></div>{errors.manualDuration && fieldError('manualDuration')}</div>
-              <div className="form-field"><label className="field-label">Tarif manual <span>*</span></label><div className="currency-input"><span>Rp</span><input className="text-input" type="number" min="1" value={manualPrice} onChange={(event) => setManualPrice(event.target.value)} placeholder="45.000" /></div>{errors.manualPrice && fieldError('manualPrice')}</div>
-              <div className="form-field full-field"><label className="field-label">Catatan alasan <span className="optional-tag">OPSIONAL</span></label><input className="text-input" value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="Contoh: harga paket event" /></div>
-            </div></div>}
+            <SectionTitle number="03" title="Durasi & pembayaran" subtitle="Tentukan durasi dan tarif untuk setiap kamera" />
+            {selectedItems.length > 0 && <div className="selected-rentals">{selectedItems.map((item) => {
+              const settings = cameraSettings[item.cameraId] || { duration: '1', manualHours: '', manualMinutes: '', manualPrice: '', manualNote: '' };
+              return <div className="rental-item-config" key={item.cameraId}>
+                <div className="rental-item-heading"><strong>{item.cameraName}</strong><button type="button" onClick={() => toggleCamera(item.cameraId)}>Hapus</button></div>
+                <div className="duration-options">
+                  {[['1', '1 jam', formatCurrency(item.camera.prices[1])], ['2', '2 jam', formatCurrency(item.camera.prices[2])], ['manual', 'Manual', 'Lebih dari 2 jam']].map(([value, title, desc]) => <button type="button" key={value} onClick={() => updateCameraSettings(item.cameraId, 'duration', value)} className={`duration-card ${settings.duration === value ? 'duration-selected' : ''}`}><span className="duration-check">{settings.duration === value && <Check size={12} />}</span><strong>{title}</strong><small>{desc}</small></button>)}
+                </div>
+                {item.isManualPrice && <div className="form-grid rental-manual-fields">
+                  <div className="form-field"><label className="field-label">Durasi manual <span>*</span></label><div className="duration-inputs"><div><input className="text-input" type="number" min="0" max="23" value={settings.manualHours} onChange={(event) => updateCameraSettings(item.cameraId, 'manualHours', event.target.value)} placeholder="3" /><span>Jam</span></div><div><input className="text-input" type="number" min="0" max="59" value={settings.manualMinutes} onChange={(event) => updateCameraSettings(item.cameraId, 'manualMinutes', event.target.value)} placeholder="00" /><span>Menit</span></div></div>{errors[`duration-${item.cameraId}`] && fieldError(`duration-${item.cameraId}`)}</div>
+                  <div className="form-field"><label className="field-label">Tarif manual <span>*</span></label><div className="currency-input"><span>Rp</span><input className="text-input" type="number" min="1" value={settings.manualPrice} onChange={(event) => updateCameraSettings(item.cameraId, 'manualPrice', event.target.value)} placeholder="45.000" /></div>{errors[`price-${item.cameraId}`] && fieldError(`price-${item.cameraId}`)}</div>
+                  <div className="form-field full-field"><label className="field-label">Catatan alasan <span className="optional-tag">OPSIONAL</span></label><input className="text-input" value={settings.manualNote} onChange={(event) => updateCameraSettings(item.cameraId, 'manualNote', event.target.value)} placeholder="Contoh: harga paket event" /></div>
+                </div>}
+              </div>;
+            })}</div>}
+            {selectedItems.length > 1 && <div className="rental-total"><span>Total semua kamera</span><strong>{formatCurrency(total)}</strong></div>}
             <div className="form-grid time-grid">
               <div className="form-field"><label className="field-label" htmlFor="startTime">Jam mulai <span>*</span></label><input id="startTime" className="text-input time-input" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></div>
               <div className="form-field"><label className="field-label">Jam selesai <span className="auto-tag">OTOMATIS</span></label><div className="readonly-input"><Clock3 size={16} /><strong>{endTime || '--:--'}</strong><span>{durationMinutes > 0 ? `Durasi ${Math.floor(durationMinutes / 60)}j ${durationMinutes % 60 ? `${durationMinutes % 60}m` : ''}` : 'Isi durasi'}</span></div></div>
@@ -704,6 +774,11 @@ function SectionTitle({ number, title, subtitle }) {
 
 function History({ transactions, isOwner, search, setSearch, location, setLocation, cashier, setCashier, date, setDate, onPrint, onVoid }) {
   const [tab, setTab] = useState('all');
+  const cameraSummary = (transaction) => (transaction.items || [{
+    cameraName: transaction.cameraName,
+    durationLabel: transaction.durationLabel,
+    isManualPrice: transaction.isManualPrice,
+  }]).map((item) => `${item.cameraName} · ${item.durationLabel}${item.isManualPrice ? ' (Manual)' : ''}`).join(', ');
   const filtered = useMemo(() => transactions.filter((transaction) => {
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || [transaction.receiptNo, transaction.customerName, transaction.customerWhatsapp].some((value) => value?.toLowerCase().includes(query));
@@ -719,7 +794,7 @@ function History({ transactions, isOwner, search, setSearch, location, setLocati
       <div className="history-tabs"><button onClick={() => setTab('all')} className={tab === 'all' ? 'history-tab-active' : ''}>Semua <span>{countFor('all')}</span></button><button onClick={() => setTab('cafe')} className={tab === 'cafe' ? 'history-tab-active' : ''}>Cafe <span>{countFor('cafe')}</span></button><button onClick={() => setTab('event')} className={tab === 'event' ? 'history-tab-active' : ''}>Event <span>{countFor('event')}</span></button></div>
       <div className="panel history-panel">
         <div className="history-toolbar"><div className="search-input"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari no. struk, nama, atau WhatsApp..." /></div><div className="filter-controls"><label className="select-filter"><Filter size={15} /><select value={location} onChange={(event) => setLocation(event.target.value)}><option value="all">Semua lokasi</option><option value="cafe">Cafe</option><option value="event">Event</option></select><ChevronDown size={14} /></label>{isOwner && <label className="select-filter"><Users size={15} /><select value={cashier} onChange={(event) => setCashier(event.target.value)}><option value="all">Semua kasir</option><option value="kasir1">Kasir 1</option><option value="kasir2">Kasir 2</option></select><ChevronDown size={14} /></label>}<label className="date-filter"><CalendarDays size={15} /><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label></div></div>
-        {filtered.length === 0 ? <EmptyState title="Transaksi tidak ditemukan" body={transactions.length ? 'Coba ubah kata kunci atau filter yang digunakan.' : 'Transaksi yang sudah dibuat akan muncul di sini.'} /> : <div className="table-wrap"><table className="history-table"><thead><tr><th>No. struk</th><th>Penyewa</th><th>Kamera & durasi</th><th>Lokasi</th>{isOwner && <th>Kasir</th>}<th>Pembayaran</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{filtered.map((transaction) => <tr key={transaction.id}><td><strong className="receipt-id">{transaction.receiptNo}</strong><small>{formatDate(transaction.createdAt)} · {transaction.startTime}</small></td><td><strong>{transaction.customerName}</strong><small>{transaction.customerWhatsapp}</small></td><td>{transaction.cameraName}{transaction.isManualPrice && <span className="manual-flag">TARIF MANUAL</span>}<small>{transaction.durationLabel}</small></td><td><span className={`location-pill location-${transaction.location}`}>{transaction.location === 'cafe' ? 'Cafe' : 'Event'}</span></td>{isOwner && <td>{transaction.cashierName}<small>{transaction.cashierId}</small></td>}<td>{transaction.paymentMethod === 'cash' ? 'Tunai' : 'QRIS DANA'}{transaction.paymentMethod === 'qris_dana' && transaction.verifiedBy && <small>Diverifikasi {transaction.verifiedBy.split(' ')[0]}</small>}</td><td className="money-cell">{formatCurrency(transaction.total)}</td><td><StatusBadge transaction={transaction} /></td><td><div className="history-actions"><button className="table-action-button" disabled={transaction.paymentStatus !== 'paid'} onClick={() => onPrint(transaction)}><Printer size={14} /> Cetak ulang</button>{isOwner && transaction.paymentStatus !== 'void' && <button className="table-action-button table-void-button" onClick={() => onVoid(transaction)}><X size={13} /> Void</button>}</div></td></tr>)}</tbody></table></div>}
+        {filtered.length === 0 ? <EmptyState title="Transaksi tidak ditemukan" body={transactions.length ? 'Coba ubah kata kunci atau filter yang digunakan.' : 'Transaksi yang sudah dibuat akan muncul di sini.'} /> : <div className="table-wrap"><table className="history-table"><thead><tr><th>No. struk</th><th>Penyewa</th><th>Kamera & durasi</th><th>Lokasi</th>{isOwner && <th>Kasir</th>}<th>Pembayaran</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{filtered.map((transaction) => <tr key={transaction.id}><td><strong className="receipt-id">{transaction.receiptNo}</strong><small>{formatDate(transaction.createdAt)} · {transaction.startTime}</small></td><td><strong>{transaction.customerName}</strong><small>{transaction.customerWhatsapp}</small></td><td>{cameraSummary(transaction)}{transaction.isManualPrice && <span className="manual-flag">TARIF MANUAL</span>}</td><td><span className={`location-pill location-${transaction.location}`}>{transaction.location === 'cafe' ? 'Cafe' : 'Event'}</span></td>{isOwner && <td>{transaction.cashierName}<small>{transaction.cashierId}</small></td>}<td>{transaction.paymentMethod === 'cash' ? 'Tunai' : 'QRIS DANA'}{transaction.paymentMethod === 'qris_dana' && transaction.verifiedBy && <small>Diverifikasi {transaction.verifiedBy.split(' ')[0]}</small>}</td><td className="money-cell">{formatCurrency(transaction.total)}</td><td><StatusBadge transaction={transaction} /></td><td><div className="history-actions"><button className="table-action-button" disabled={transaction.paymentStatus !== 'paid'} onClick={() => onPrint(transaction)}><Printer size={14} /> Cetak ulang</button>{isOwner && transaction.paymentStatus !== 'void' && <button className="table-action-button table-void-button" onClick={() => onVoid(transaction)}><X size={13} /> Void</button>}</div></td></tr>)}</tbody></table></div>}
         <div className="table-footer"><span>Menampilkan <strong>{filtered.length}</strong> dari <strong>{transactions.length}</strong> transaksi termuat</span><span>Riwayat bersumber dari server</span></div>
       </div>
     </>

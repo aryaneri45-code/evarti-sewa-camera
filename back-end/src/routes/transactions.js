@@ -27,6 +27,21 @@ function recordAudit(db, userId, action, transactionId, detail = null) {
     .run(randomUUID(), userId, action, transactionId, detail, new Date().toISOString());
 }
 
+function serializeWithItems(db, row, options = {}) {
+  const items = db.prepare(`
+    SELECT camera_id AS cameraId, camera_name AS cameraName, duration_label AS durationLabel,
+      duration_minutes AS durationMinutes, price, is_manual_price AS isManualPrice,
+      manual_note AS manualNote
+    FROM transaction_items
+    WHERE transaction_id = ?
+    ORDER BY position
+  `).all(row.id).map((item) => ({
+    ...item,
+    isManualPrice: Boolean(item.isManualPrice),
+  }));
+  return serializeTransaction(row, { ...options, items });
+}
+
 function parseUploadPayload(request) {
   if (request.is('multipart/form-data')) {
     if (typeof request.body?.payload !== 'string') {
@@ -108,17 +123,39 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
           verifiedAt: transactionData.paymentStatus === 'paid' ? new Date().toISOString() : null,
           createdAt: new Date().toISOString(),
         });
+        const insertItem = db.prepare(`
+          INSERT INTO transaction_items (
+            transaction_id, position, camera_id, camera_name, duration_label,
+            duration_minutes, price, is_manual_price, manual_note
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        transactionData.items.forEach((item, index) => {
+          insertItem.run(
+            id,
+            index + 1,
+            item.camera.id,
+            item.camera.name,
+            item.durationLabel,
+            item.durationMinutes,
+            item.price,
+            item.isManualPrice ? 1 : 0,
+            item.manualNote,
+          );
+        });
         if (transactionData.isManualPrice) {
           recordAudit(db, request.user.id, 'manual_price_created', id, JSON.stringify({
-            durationMinutes: transactionData.durationMinutes,
-            amount: transactionData.price,
-            note: transactionData.manualNote,
+            items: transactionData.items.filter((item) => item.isManualPrice).map((item) => ({
+              cameraName: item.camera.name,
+              durationMinutes: item.durationMinutes,
+              amount: item.price,
+              note: item.manualNote,
+            })),
           }));
         }
       })();
       const row = db.prepare(`${transactionSelect} WHERE t.id = ?`).get(id);
       return response.status(201).json({
-        transaction: serializeTransaction(row, { includeSensitive: true }),
+        transaction: serializeWithItems(db, row, { includeSensitive: true }),
       });
     } catch (error) {
       if (request.file) removeUploadedFile(request.file);
@@ -167,7 +204,7 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
       const rows = db.prepare(`${transactionSelect} ${where} ORDER BY t.created_at DESC LIMIT ? OFFSET ?`)
         .all(...values, limit, offset);
       return response.json({
-        transactions: rows.map((row) => serializeTransaction(row)),
+        transactions: rows.map((row) => serializeWithItems(db, row)),
         pagination: { limit, offset, returned: rows.length },
       });
     } catch (error) {
@@ -195,7 +232,7 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
     try {
       const row = db.prepare(`${transactionSelect} WHERE t.id = ?`).get(request.params.id);
       if (!row || !canReadTransaction(request, row)) throw notFound('Transaksi tidak ditemukan.');
-      return response.json({ transaction: serializeTransaction(row, { includeSensitive: true }) });
+      return response.json({ transaction: serializeWithItems(db, row, { includeSensitive: true }) });
     } catch (error) {
       return next(error);
     }
@@ -217,7 +254,7 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
         recordAudit(db, request.user.id, 'qris_verified', row.id, JSON.stringify({ verifiedAt }));
       })();
       const updated = db.prepare(`${transactionSelect} WHERE t.id = ?`).get(row.id);
-      return response.json({ transaction: serializeTransaction(updated, { includeSensitive: true }) });
+      return response.json({ transaction: serializeWithItems(db, updated, { includeSensitive: true }) });
     } catch (error) {
       return next(error);
     }
@@ -239,7 +276,7 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
         recordAudit(db, request.user.id, 'transaction_voided', row.id, JSON.stringify({ reason, voidedAt }));
       })();
       const updated = db.prepare(`${transactionSelect} WHERE t.id = ?`).get(row.id);
-      return response.json({ transaction: serializeTransaction(updated, { includeSensitive: true }) });
+      return response.json({ transaction: serializeWithItems(db, updated, { includeSensitive: true }) });
     } catch (error) {
       return next(error);
     }
@@ -255,7 +292,7 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
         recordAudit(db, request.user.id, 'receipt_reprinted', row.id, null);
       })();
       const updated = db.prepare(`${transactionSelect} WHERE t.id = ?`).get(row.id);
-      return response.json({ transaction: serializeTransaction(updated) });
+      return response.json({ transaction: serializeWithItems(db, updated) });
     } catch (error) {
       return next(error);
     }

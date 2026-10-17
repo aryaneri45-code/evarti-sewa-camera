@@ -72,11 +72,12 @@ export function createReportsRouter({ db }) {
         GROUP BY u.id ORDER BY revenue DESC
       `).all(...filters.values);
       const popularCameras = db.prepare(`
-        SELECT t.camera_id, t.camera_name, COUNT(*) AS rental_count,
-          SUM(t.total) AS revenue
+        SELECT i.camera_id, i.camera_name, COUNT(*) AS rental_count,
+          SUM(i.price) AS revenue
         FROM transactions t JOIN users u ON u.id = t.cashier_id
+        JOIN transaction_items i ON i.transaction_id = t.id
         ${filters.where} AND t.payment_status = 'paid'
-        GROUP BY t.camera_id, t.camera_name
+        GROUP BY i.camera_id, i.camera_name
         ORDER BY rental_count DESC, revenue DESC LIMIT 5
       `).all(...filters.values);
       const trend = db.prepare(`

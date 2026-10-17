@@ -79,6 +79,19 @@ const schema = `
     printed_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS transaction_items (
+    transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    camera_id TEXT REFERENCES cameras(id) ON DELETE SET NULL,
+    camera_name TEXT NOT NULL,
+    duration_label TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL CHECK (duration_minutes > 0),
+    price INTEGER NOT NULL CHECK (price > 0),
+    is_manual_price INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_price IN (0, 1)),
+    manual_note TEXT,
+    PRIMARY KEY (transaction_id, position)
+  );
+  CREATE INDEX IF NOT EXISTS transaction_items_camera_idx ON transaction_items(camera_id);
   CREATE INDEX IF NOT EXISTS transactions_cashier_created_idx ON transactions(cashier_id, created_at);
   CREATE INDEX IF NOT EXISTS transactions_location_created_idx ON transactions(location, created_at);
   CREATE TABLE IF NOT EXISTS audit_logs (
@@ -107,6 +120,18 @@ export function createDatabase({ filename = './.data/evarti.sqlite', passwords, 
   if (!transactionColumns.some((column) => column.name === 'customer_pager_number')) {
     db.exec('ALTER TABLE transactions ADD COLUMN customer_pager_number TEXT');
   }
+  db.exec(`
+    INSERT INTO transaction_items (
+      transaction_id, position, camera_id, camera_name, duration_label,
+      duration_minutes, price, is_manual_price, manual_note
+    )
+    SELECT t.id, 1, t.camera_id, t.camera_name, t.duration_label,
+      t.duration_minutes, t.price, t.is_manual_price, t.manual_note
+    FROM transactions t
+    WHERE NOT EXISTS (
+      SELECT 1 FROM transaction_items i WHERE i.transaction_id = t.id
+    )
+  `);
   seedDatabase(db, passwords);
   return db;
 }
