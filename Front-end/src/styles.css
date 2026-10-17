@@ -281,6 +281,8 @@ td small { display: block; margin-top: 5px; color: #a69a9f; font-size: 9px; }
 .receipt-location-tag { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #b57181; font-size: 8px; font-weight: 700; letter-spacing: .6px; }
 .receipt-location-tag span { color: #d6c8cc; }
 .receipt-paper { width: 100%; max-width: 260px; margin: 0 auto; padding: 15px 14px 13px; background: #fffdfa; color: #373236; box-shadow: 0 3px 12px #49333b13; font-family: 'Courier New', monospace; font-size: 8.2px; }
+.receipt-admin-title { margin: 1px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-align: center; }
+.receipt-admin-item { margin: 6px 0; overflow-wrap: anywhere; }
 .receipt-brand { margin-bottom: 2px; color: #373236; font-family: 'Playfair Display', serif; font-size: 25px; font-weight: 700; letter-spacing: 1px; text-align: center; }
 .receipt-tagline { margin-bottom: 11px; font-size: 7px; text-align: center; }
 .receipt-rule { margin: 8px 0; border-top: 1px dashed #918b89; }
@@ -425,11 +427,24 @@ td small { display: block; margin-top: 5px; color: #a69a9f; font-size: 9px; }
 .print-help-icon { display: grid; width: 43px; height: 43px; place-items: center; margin-bottom: 16px; border-radius: 12px; color: #c46d80; background: #fff0f3; }
 .print-help h2 { margin: 0; font-family: 'Playfair Display', serif; font-size: 19px; }
 .print-help p { color: #988d91; font-size: 10px; line-height: 1.6; }
+.print-change-format { margin-top: 9px; }
 .print-steps { display: grid; gap: 11px; margin: 18px 0 22px; }
 .print-steps span { display: flex; align-items: center; gap: 8px; color: #766a6f; font-size: 9px; }
 .print-steps i { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; color: #b76176; background: #fff0f3; font-size: 8px; font-style: normal; font-weight: 700; }
 .print-preview { display: grid; justify-items: center; gap: 10px; padding: 19px; border: 1px dashed #e8dadd; border-radius: 10px; background: #fffafb; }
 .print-preview .receipt-paper { width: 220px; }
+.print-view-options { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 18px 0 14px; padding: 4px; border-radius: 8px; background: #f8f3f4; }
+.print-view-options button { min-height: 34px; padding: 0 7px; border: 0; border-radius: 6px; background: transparent; color: #82747a; cursor: pointer; font-size: 9px; }
+.print-view-options .print-view-active { background: white; color: #ad5e72; box-shadow: 0 1px 4px #49333b16; font-weight: 700; }
+.print-choice-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: #24191db8; }
+.print-choice-dialog { position: relative; width: min(420px, 100%); padding: 25px; border: 1px solid #f0e7e9; border-radius: 14px; background: white; box-shadow: 0 20px 65px #24191d40; }
+.print-choice-dialog .print-help-icon { margin-bottom: 14px; }
+.print-choice-dialog .eyebrow { color: #bd7787; font-size: 8px; letter-spacing: .8px; }
+.print-choice-dialog h2 { margin: 6px 0; color: #514249; font-family: 'Playfair Display', serif; font-size: 21px; }
+.print-choice-dialog > p { margin: 0; color: #988d91; font-size: 10px; }
+.print-choice-close { position: absolute; top: 14px; right: 14px; display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 7px; background: #faf5f6; color: #8d7d83; cursor: pointer; }
+.print-choice-options { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 22px; }
+.print-choice-options .button { justify-content: center; padding: 0 8px; }
 
 .login-page { display: grid; min-height: 100vh; grid-template-columns: 1.02fr .98fr; background: #fff; }
 .login-visual { position: relative; display: flex; min-height: 100vh; flex-direction: column; overflow: hidden; padding: 35px 45px 24px; background: linear-gradient(145deg, #d97e90, #e69ba9 58%, #f1b6c0); color: white; }
@@ -635,6 +650,8 @@ td small { display: block; margin-top: 5px; color: #a69a9f; font-size: 9px; }
   html, body, #root { width: 58mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; background: white !important; }
   body * { visibility: hidden !important; }
   .receipt-paper, .receipt-paper * { visibility: visible !important; }
+  .receipt-admin-title { font-size: 11pt !important; }
+  .receipt-admin-item { margin: 2mm 0 !important; }
   .receipt-paper { position: absolute !important; top: 0 !important; left: 0 !important; display: block !important; width: 58mm !important; max-width: 58mm !important; margin: 0 !important; padding: 2mm 4mm !important; box-shadow: none !important; color: #000 !important; font-family: 'Courier New', monospace !important; font-size: 9pt !important; }
   .receipt-brand { font-size: 22pt !important; }
   .receipt-tagline { font-size: 7pt !important; }

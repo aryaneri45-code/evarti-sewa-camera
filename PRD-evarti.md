@@ -123,6 +123,7 @@ Field input:
 - Cetak via browser menggunakan CSS `@media print` dengan lebar halaman **58 mm** (area cetak efektif ±48 mm).
 - Tanpa margin berlebih, font monospace, garis pemisah putus-putus.
 - Tombol **Cetak** tersedia setelah struk disimpan; dapat dicetak ulang dari riwayat (ditandai "Cetak Ulang" dalam log).
+- Sebelum mencetak, kasir memilih format **Struk Admin** atau **Struk Pelanggan/Penyewa** sesuai contoh pada bagian 5.
 
 ### 4.7 Ekspor PDF
 - **PDF untuk Ringkasan** (laporan/rekap transaksi per periode, per kasir, per lokasi).
@@ -153,6 +154,41 @@ Field input:
 - Dashboard Kasir menampilkan ringkasan miliknya saja (transaksi & pendapatan hari ini).
 
 ## 5. Format Struk
+
+## 5.1 Format Struk admin
+
+Struk admin adalah salinan internal untuk membantu kasir dan tim operasional
+mengenali pesanan serta mengingat detail waktu sewa. Format ini dicetak
+terpisah dari struk pelanggan.
+
+```text
+            NEW ORDER
+--------------------------------
+No. Struk        EVT-20261017-001
+Tanggal                17/10/2026
+Jam Mulai                  06:40
+Jam Selesai                08:40
+Penyewa                    aryan
+No. WA               081234567890
+No. Pager                  P-07
+--------------------------------
+2 Jam - Casio
+1 jam - canon ixus 285
+```
+
+**Ketentuan format struk admin:**
+- Header **NEW ORDER** dicetak di bagian paling atas dan rata tengah.
+- Baris **No. Struk** langsung mengikuti header, kemudian tanggal, jam mulai,
+  jam selesai, nama penyewa, nomor WhatsApp, dan nomor pager jika diisi.
+- Setelah data penyewa, setiap kamera dicetak pada baris tersendiri dengan
+  format `Durasi - Nama Kamera`; kamera ditampilkan sesuai urutan pada
+  transaksi.
+- Struk admin tidak menampilkan harga, total pembayaran, metode pembayaran,
+  uang diterima, kembalian, atau footer struk pelanggan.
+- Pratinjau dan cetak admin berada pada tampilan tersendiri yang dapat dipilih
+  dari pilihan format struk.
+
+## 5.2 Format Struk pelanggan atau penyewa
 
 Struk mengikuti desain yang sudah ditetapkan (lihat gambar referensi). Layout berurutan dari atas:
 

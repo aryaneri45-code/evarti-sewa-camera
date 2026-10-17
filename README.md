@@ -16,6 +16,7 @@ desktop.
   sewa, lokasi, metode pembayaran, dan informasi jaminan opsional.
 - Tarif dan durasi manual untuk penyewaan lebih dari 2 jam.
 - Pratinjau, penyimpanan, cetak, dan cetak ulang struk thermal 58 mm.
+- Pilihan cetak struk Admin (format `NEW ORDER`) atau struk Pelanggan, masing-masing dengan tampilan cetak tersendiri.
 - Nomor pager yang dimasukkan ikut tersimpan dan dicetak pada struk.
 - Riwayat transaksi dengan akses sesuai peran, serta fitur verifikasi
   pembayaran, pembatalan (void), dan pencatatan audit untuk aksi penting.

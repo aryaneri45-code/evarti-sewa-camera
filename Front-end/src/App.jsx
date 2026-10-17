@@ -133,9 +133,35 @@ function StatCard({ label, value, detail, icon: Icon, tone = 'pink', trend }) {
   );
 }
 
-function Receipt({ transaction }) {
+function Receipt({ transaction, variant = 'customer' }) {
   if (!transaction) return null;
   const currency = (value) => formatCurrency(value).replace('IDR', 'Rp');
+  const items = transaction.items?.length ? transaction.items : [{
+    cameraId: transaction.cameraId,
+    cameraName: transaction.cameraName || 'Pilih kamera',
+    durationLabel: transaction.durationLabel,
+    price: transaction.total,
+    isManualPrice: transaction.isManualPrice,
+  }];
+  if (variant === 'admin') {
+    return (
+      <div className="receipt-paper receipt-admin">
+        <div className="receipt-admin-title">NEW ORDER</div>
+        <div className="receipt-rule" />
+        <div className="receipt-row"><span>No. Struk</span><b>{transaction.receiptNo}</b></div>
+        <div className="receipt-row"><span>Tanggal</span><b>{new Intl.DateTimeFormat('id-ID').format(new Date(transaction.createdAt))}</b></div>
+        <div className="receipt-row"><span>Jam Mulai</span><b>{transaction.startTime}</b></div>
+        <div className="receipt-row"><span>Jam Selesai</span><b>{transaction.endTime}</b></div>
+        <div className="receipt-row"><span>Penyewa</span><b>{transaction.customerName}</b></div>
+        <div className="receipt-row"><span>No. WA</span><b>{transaction.customerWhatsapp}</b></div>
+        {transaction.customerPagerNumber && <div className="receipt-row"><span>No. Pager</span><b>{transaction.customerPagerNumber}</b></div>}
+        <div className="receipt-rule" />
+        {items.map((item, index) => <div className="receipt-admin-item" key={`${item.cameraId || item.cameraName}-${index}`}>
+          {item.durationLabel}{item.isManualPrice ? ' (Manual)' : ''} - {item.cameraName}
+        </div>)}
+      </div>
+    );
+  }
   return (
     <div className="receipt-paper">
       <div className="receipt-brand">evarti</div>
@@ -149,12 +175,7 @@ function Receipt({ transaction }) {
       <div className="receipt-row"><span>No. WA</span><b>{transaction.customerWhatsapp || '08xxxxxxxxxx'}</b></div>
       {transaction.customerPagerNumber && <div className="receipt-row"><span>No. Pager</span><b>{transaction.customerPagerNumber}</b></div>}
       <div className="receipt-rule" />
-      {(transaction.items?.length ? transaction.items : [{
-        cameraName: transaction.cameraName || 'Pilih kamera',
-        durationLabel: transaction.durationLabel,
-        price: transaction.total,
-        isManualPrice: transaction.isManualPrice,
-      }]).map((item, index) => <React.Fragment key={`${item.cameraId || item.cameraName}-${index}`}>
+      {items.map((item, index) => <React.Fragment key={`${item.cameraId || item.cameraName}-${index}`}>
         <div className="receipt-item-name">{item.cameraName}</div>
         <div className="receipt-row"><span>{item.durationLabel}{item.isManualPrice ? ' · Tarif Manual' : ''}</span><b>{currency(item.price)}</b></div>
       </React.Fragment>)}
@@ -196,6 +217,9 @@ function App() {
   const [historyLocation, setHistoryLocation] = useState('all');
   const [historyCashier, setHistoryCashier] = useState('all');
   const [historyDate, setHistoryDate] = useState('');
+  const [printSelection, setPrintSelection] = useState(null);
+  const [printSubmitting, setPrintSubmitting] = useState(false);
+  const [printVariant, setPrintVariant] = useState('customer');
   const printTimer = useRef(null);
 
   const refreshWorkspace = useCallback(async () => {
@@ -274,17 +298,40 @@ function App() {
   const paidToday = todayTransactions.filter((transaction) => transaction.paymentStatus === 'paid');
   const revenueToday = paidToday.reduce((sum, transaction) => sum + Number(transaction.total), 0);
 
-  const openPrint = async (transaction) => {
+  const openPrint = (transaction) => {
+    if (transaction.paymentStatus !== 'paid') {
+      setNotice('Struk hanya dapat dicetak setelah pembayaran lunas.');
+      return;
+    }
+    setPrintSelection(transaction);
+  };
+
+  const selectPrintVariant = async (variant) => {
+    const transaction = printSelection;
+    if (!transaction || printSubmitting) return;
+    setPrintSubmitting(true);
     try {
-      if (transaction.paymentStatus !== 'paid') {
-        setNotice('Struk hanya dapat dicetak setelah pembayaran lunas.');
-        return;
-      }
       const result = await api.markPrinted(transaction.id);
       setSavedTransaction(result.transaction);
       setTransactions((previous) => previous.map((item) => item.id === transaction.id ? result.transaction : item));
-      setPage('print');
+      setPrintVariant(variant);
+      setPrintSelection(null);
+      setPage(`print-${variant}`);
       printTimer.current = window.setTimeout(() => window.print(), 220);
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setPrintSubmitting(false);
+    }
+  };
+
+  const printSelectedVariant = async () => {
+    if (!savedTransaction) return;
+    try {
+      const result = await api.markPrinted(savedTransaction.id);
+      setSavedTransaction(result.transaction);
+      setTransactions((previous) => previous.map((item) => item.id === savedTransaction.id ? result.transaction : item));
+      printTimer.current = window.setTimeout(() => window.print(), 100);
     } catch (error) {
       setNotice(error.message);
     }
@@ -425,9 +472,22 @@ function App() {
               }
             }}
           />}
-          {page === 'print' && savedTransaction && <PrintView transaction={savedTransaction} onBack={() => setPage('create')} onPrint={() => openPrint(savedTransaction)} />}
+          {(page === 'print-admin' || page === 'print-customer') && savedTransaction && <PrintView transaction={savedTransaction} variant={printVariant} onBack={() => setPage('history')} onPrint={printSelectedVariant} onChangeFormat={() => setPrintSelection(savedTransaction)} />}
         </div>
       </main>
+      {printSelection && <div className="print-choice-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPrintSelection(null); }}>
+        <section className="print-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="print-choice-title">
+          <button className="print-choice-close" type="button" onClick={() => setPrintSelection(null)} aria-label="Tutup pilihan cetak"><X size={18} /></button>
+          <div className="print-help-icon"><Printer size={21} /></div>
+          <span className="eyebrow">PILIH FORMAT</span>
+          <h2 id="print-choice-title">Struk yang akan dicetak</h2>
+          <p>{printSelection.receiptNo} · Pilih salinan sesuai keperluan.</p>
+          <div className="print-choice-options">
+            <button className="button button-secondary" type="button" disabled={printSubmitting} onClick={() => selectPrintVariant('admin')}><Printer size={16} /> Struk Admin</button>
+            <button className="button button-primary" type="button" disabled={printSubmitting} onClick={() => selectPrintVariant('customer')}><Printer size={16} /> Struk Pelanggan</button>
+          </div>
+        </section>
+      </div>}
       {notice && page !== 'create' && <div className="toast"><CheckCircle2 size={17} />{notice}<button onClick={() => setNotice('')} aria-label="Tutup"><X size={15} /></button></div>}
     </div>
   );
@@ -934,8 +994,9 @@ function Reports({
   );
 }
 
-function PrintView({ transaction, onBack, onPrint }) {
-  return <div className="print-page"><PageHeading eyebrow="STRUK PENYEWAAN" title="Siap untuk dicetak." description={`${transaction.receiptNo} · ${transaction.location === 'cafe' ? 'Cafe' : 'Event'}`} action={<button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Kembali</button>} /><div className="print-layout"><div className="panel print-help"><div className="print-help-icon"><Printer size={22} /></div><h2>Cetak struk thermal</h2><p>Gunakan kertas 58 mm. Pada dialog cetak, pilih printer Rongta RPP02N atau printer thermal yang tersedia.</p><div className="print-steps"><span><i>1</i> Klik tombol cetak</span><span><i>2</i> Pilih printer &amp; ukuran kertas</span><span><i>3</i> Pastikan skala 100%</span></div><button className="button button-primary" onClick={onPrint}><Printer size={17} /> Cetak sekarang</button></div><div className="print-preview"><span className="eyebrow">PRATINJAU · 58 MM</span><Receipt transaction={transaction} /></div></div></div>;
+function PrintView({ transaction, variant, onBack, onPrint, onChangeFormat }) {
+  const isAdmin = variant === 'admin';
+  return <div className="print-page"><PageHeading eyebrow={isAdmin ? 'STRUK ADMIN' : 'STRUK PELANGGAN'} title="Siap untuk dicetak." description={`${transaction.receiptNo} · ${transaction.location === 'cafe' ? 'Cafe' : 'Event'}`} action={<button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Kembali</button>} /><div className="print-layout"><div className="panel print-help"><div className="print-help-icon"><Printer size={22} /></div><h2>Struk {isAdmin ? 'admin' : 'pelanggan'}</h2><p>Gunakan kertas 58 mm. Pada dialog cetak, pilih printer Rongta RPP02N atau printer thermal yang tersedia.</p><div className="print-steps"><span><i>1</i> Klik tombol cetak</span><span><i>2</i> Pilih printer &amp; ukuran kertas</span><span><i>3</i> Pastikan skala 100%</span></div><button className="button button-primary" onClick={onPrint}><Printer size={17} /> Cetak struk {isAdmin ? 'admin' : 'pelanggan'}</button><button className="button button-secondary print-change-format" onClick={onChangeFormat}>Pilih format struk lainnya</button></div><div className="print-preview"><span className="eyebrow">PRATINJAU · 58 MM · {isAdmin ? 'ADMIN' : 'PELANGGAN'}</span><Receipt transaction={transaction} variant={variant} /></div></div></div>;
 }
 
 export default App;
