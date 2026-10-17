@@ -12,6 +12,21 @@ export const initialCameras = [
   { id: 'canon-ixus-285', name: 'Canon Ixus 285', price1h: 35000, price2h: 50000 },
 ];
 
+export const initialAddons = [
+  { id: 'analog-camera', category: 'property', label: 'Camera analog', price: 10000 },
+  { id: 'dummy-flowers', category: 'property', label: 'Bunga dummy', price: 5000 },
+  { id: 'umbrella', category: 'property', label: 'Payung', price: 7000 },
+  { id: 'photographer-5', category: 'photographer', label: '5 foto', price: 10000 },
+  { id: 'photographer-10', category: 'photographer', label: '10 foto', price: 15000 },
+  { id: 'photographer-15', category: 'photographer', label: '15 foto', price: 20000 },
+  { id: 'print-5', category: 'print', label: '5 foto', price: 10000 },
+  { id: 'print-10', category: 'print', label: '10 foto', price: 15000 },
+  { id: 'print-15', category: 'print', label: '15 foto', price: 20000 },
+  { id: 'file-whatsapp', category: 'transfer', label: 'Via WhatsApp', price: 0 },
+  { id: 'file-airdrop', category: 'transfer', label: 'Via AirDrop', price: 0 },
+  { id: 'file-drive', category: 'transfer', label: 'Via Drive', price: 0 },
+];
+
 const schema = `
   PRAGMA foreign_keys = ON;
   CREATE TABLE IF NOT EXISTS users (
@@ -38,6 +53,14 @@ const schema = `
     price_2h INTEGER NOT NULL CHECK (price_2h > 0),
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS addons (
+    id TEXT PRIMARY KEY,
+    category TEXT NOT NULL CHECK (category IN ('property', 'photographer', 'print', 'transfer')),
+    label TEXT NOT NULL,
+    price INTEGER NOT NULL CHECK (price >= 0),
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
   CREATE TABLE IF NOT EXISTS receipt_sequences (
@@ -89,6 +112,15 @@ const schema = `
     price INTEGER NOT NULL CHECK (price > 0),
     is_manual_price INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_price IN (0, 1)),
     manual_note TEXT,
+    PRIMARY KEY (transaction_id, position)
+  );
+  CREATE TABLE IF NOT EXISTS transaction_addons (
+    transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    addon_id TEXT NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('property', 'photographer', 'print', 'transfer')),
+    label TEXT NOT NULL,
+    price INTEGER NOT NULL CHECK (price >= 0),
     PRIMARY KEY (transaction_id, position)
   );
   CREATE INDEX IF NOT EXISTS transaction_items_camera_idx ON transaction_items(camera_id);
@@ -162,6 +194,12 @@ export function seedDatabase(db, passwords = {}) {
   );
   for (const camera of initialCameras) {
     insertCamera.run(camera.id, camera.name, camera.price1h, camera.price2h);
+  }
+  const insertAddon = db.prepare(
+    'INSERT OR IGNORE INTO addons (id, category, label, price, active) VALUES (?, ?, ?, ?, 1)',
+  );
+  for (const addon of initialAddons) {
+    insertAddon.run(addon.id, addon.category, addon.label, addon.price);
   }
 }
 

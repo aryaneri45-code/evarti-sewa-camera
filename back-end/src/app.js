@@ -8,6 +8,7 @@ import { createDatabase } from './db.js';
 import { requireAuth, requireCsrf, requireRole } from './middleware/auth.js';
 import { createImageUpload } from './middleware/uploads.js';
 import { createAuditRouter } from './routes/audit.js';
+import { createAddonsRouter } from './routes/addons.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createCamerasRouter } from './routes/cameras.js';
 import { createReportsRouter } from './routes/reports.js';
@@ -66,10 +67,15 @@ export function createApp(config = {}) {
   });
   app.use('/api/auth', authRouter);
   app.use('/api/cameras', (request, response, next) => {
-    if (['POST', 'PUT', 'PATCH'].includes(request.method)) return requireRole('owner')(request, response, next);
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return requireRole('owner')(request, response, next);
     return next();
   });
   app.use('/api/cameras', createCamerasRouter({ db, cameraUploadDir, upload: cameraUpload }));
+  app.use('/api/addons', (request, response, next) => {
+    if (['POST', 'PUT', 'DELETE'].includes(request.method)) return requireRole('owner')(request, response, next);
+    return next();
+  });
+  app.use('/api/addons', createAddonsRouter({ db }));
   app.use('/api/transactions', createTransactionsRouter({ db, privateUploadDir, guaranteeUpload }));
   app.use('/api/reports', createReportsRouter({ db }));
   app.use('/api/audit-logs', requireRole('owner'), createAuditRouter({ db }));

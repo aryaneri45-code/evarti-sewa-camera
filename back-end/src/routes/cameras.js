@@ -70,6 +70,26 @@ export function createCamerasRouter({ db, cameraUploadDir, upload }) {
     }
   });
 
+  router.delete('/:id', (request, response, next) => {
+    try {
+      const camera = db.prepare('SELECT * FROM cameras WHERE id = ?').get(request.params.id);
+      if (!camera) throw notFound('Kamera tidak ditemukan.');
+      db.prepare('DELETE FROM cameras WHERE id = ?').run(camera.id);
+      if (camera.image_path) {
+        try {
+          fs.unlinkSync(safeImagePath(cameraUploadDir, camera.image_path));
+        } catch (error) {
+          if (error.code !== 'ENOENT') {
+            console.error('Unable to remove deleted camera image:', error);
+          }
+        }
+      }
+      return response.status(204).end();
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   router.patch('/:id/active', (request, response, next) => {
     try {
       if (typeof request.body?.active !== 'boolean') throw new HttpError(400, 'Status active harus berupa boolean.', 'VALIDATION_ERROR');

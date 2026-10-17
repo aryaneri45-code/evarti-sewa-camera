@@ -39,7 +39,13 @@ function serializeWithItems(db, row, options = {}) {
     ...item,
     isManualPrice: Boolean(item.isManualPrice),
   }));
-  return serializeTransaction(row, { ...options, items });
+  const addons = db.prepare(`
+    SELECT addon_id AS id, category, label, price
+    FROM transaction_addons
+    WHERE transaction_id = ?
+    ORDER BY position
+  `).all(row.id);
+  return serializeTransaction(row, { ...options, items, addons });
 }
 
 function parseUploadPayload(request) {
@@ -141,6 +147,13 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
             item.isManualPrice ? 1 : 0,
             item.manualNote,
           );
+        });
+        const insertAddon = db.prepare(`
+          INSERT INTO transaction_addons (transaction_id, position, addon_id, category, label, price)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        transactionData.addons.forEach((addon, index) => {
+          insertAddon.run(id, index + 1, addon.id, addon.category, addon.label, addon.price);
         });
         if (transactionData.isManualPrice) {
           recordAudit(db, request.user.id, 'manual_price_created', id, JSON.stringify({

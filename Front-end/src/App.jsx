@@ -5,7 +5,7 @@ import {
   ChevronRight, Clock3, CreditCard, FileText, Filter, ImagePlus, LayoutDashboard,
   LogOut, Menu, MoreHorizontal, Plus, Printer, Search, Settings2, ShieldCheck,
   ShoppingBag, SlidersHorizontal, Sparkles, Store, UserRound, Users, Wallet,
-  X,
+  Trash2, X,
 } from 'lucide-react';
 import { api, assetUrl, imageCredentials } from './services/api.js';
 
@@ -25,6 +25,12 @@ const formatCurrency = (amount) => new Intl.NumberFormat('id-ID', {
 const formatDate = (value = new Date()) => new Intl.DateTimeFormat('id-ID', {
   day: '2-digit', month: 'short', year: 'numeric',
 }).format(new Date(value));
+const addonCategoryLabels = {
+  property: 'Properti',
+  photographer: 'Fotografer',
+  print: 'Print foto',
+  transfer: 'Pemindahan file',
+};
 const jakartaToday = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Jakarta',
 }).format(new Date());
@@ -145,6 +151,7 @@ function Receipt({ transaction, variant = 'customer' }) {
     price: transaction.total,
     isManualPrice: transaction.isManualPrice,
   }];
+  const addons = transaction.addons || [];
   if (variant === 'admin') {
     return (
       <div className="receipt-paper receipt-admin">
@@ -161,6 +168,9 @@ function Receipt({ transaction, variant = 'customer' }) {
         <div className="receipt-rule" />
         {items.map((item, index) => <div className="receipt-admin-item" key={`${item.cameraId || item.cameraName}-${index}`}>
           {item.durationLabel}{item.isManualPrice ? ' (Manual)' : ''} - {item.cameraName}
+        </div>)}
+        {addons.map((addon) => <div className="receipt-admin-item" key={addon.id}>
+          {addonCategoryLabels[addon.category]} - {addon.label}{addon.price > 0 ? ` - ${currency(addon.price)}` : ''}
         </div>)}
       </div>
     );
@@ -180,6 +190,10 @@ function Receipt({ transaction, variant = 'customer' }) {
       {items.map((item, index) => <React.Fragment key={`${item.cameraId || item.cameraName}-${index}`}>
         <div className="receipt-item-name">{item.cameraName}</div>
         <div className="receipt-row"><span>{item.durationLabel}{item.isManualPrice ? ' · Tarif Manual' : ''}</span><b>{currency(item.price)}</b></div>
+      </React.Fragment>)}
+      {addons.map((addon) => <React.Fragment key={addon.id}>
+        <div className="receipt-item-name">{addonCategoryLabels[addon.category]} · {addon.label}</div>
+        <div className="receipt-row"><span>Add-on</span><b>{addon.price > 0 ? currency(addon.price) : 'Gratis'}</b></div>
       </React.Fragment>)}
       <div className="receipt-rule" />
       <div className="receipt-row receipt-total"><span>TOTAL</span><b>{currency(transaction.total)}</b></div>
@@ -203,6 +217,7 @@ function App() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [appError, setAppError] = useState('');
   const [cameras, setCameras] = useState([]);
+  const [addons, setAddons] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -229,11 +244,13 @@ function App() {
     setWorkspaceLoading(true);
     setAppError('');
     try {
-      const [cameraResult, transactionResult] = await Promise.all([
+      const [cameraResult, addonResult, transactionResult] = await Promise.all([
         api.cameras(),
+        api.addons(),
         api.transactions({ limit: 100 }),
       ]);
       setCameras(cameraResult.cameras);
+      setAddons(addonResult.addons);
       setTransactions(transactionResult.transactions);
     } catch (error) {
       if (error.status !== 401) setAppError(error.message);
@@ -246,6 +263,7 @@ function App() {
     const unauthorized = () => {
       setUser(null);
       setCameras([]);
+      setAddons([]);
       setTransactions([]);
       setPage('dashboard');
     };
@@ -261,6 +279,7 @@ function App() {
   useEffect(() => {
     if (!user) {
       setCameras([]);
+      setAddons([]);
       setTransactions([]);
       return;
     }
@@ -385,7 +404,7 @@ function App() {
             revenueToday={revenueToday} onNavigate={setPage} onPrint={openPrint}
           />}
           {page === 'create' && <CreateTransaction
-            user={user} cameras={visibleCameras} onSave={(transaction) => {
+            user={user} cameras={visibleCameras} addons={addons.filter((addon) => addon.active)} onSave={(transaction) => {
               return api.createTransaction(transaction.payload, transaction.guaranteePhoto).then(({ transaction: saved }) => {
                 setTransactions((previous) => [saved, ...previous.filter((item) => item.id !== saved.id)]);
                 setSavedTransaction(saved);
@@ -416,7 +435,7 @@ function App() {
             }}
           />}
           {page === 'catalog' && isOwner && <Catalog
-            cameras={cameras} draft={catalogDraft} setDraft={setCatalogDraft}
+            cameras={cameras} addons={addons} draft={catalogDraft} setDraft={setCatalogDraft}
             onCreate={async (camera, image) => {
               const { camera: created } = await api.createCamera(camera);
               if (image) await api.uploadCameraImage(created.id, image);
@@ -433,6 +452,29 @@ function App() {
               await api.toggleCamera(id, active);
               await refreshWorkspace();
               setNotice(active ? 'Kamera kembali aktif di katalog.' : 'Kamera dinonaktifkan dari katalog kasir.');
+            }}
+            onDeleteCamera={async (camera) => {
+              if (!window.confirm(`Hapus kamera "${camera.name}" dari katalog? Detail transaksi lama tetap tersimpan.`)) return;
+              await api.deleteCamera(camera.id);
+              if (catalogDraft?.id === camera.id) setCatalogDraft(null);
+              await refreshWorkspace();
+              setNotice('Kamera berhasil dihapus dari katalog.');
+            }}
+            onCreateAddon={async (addon) => {
+              const result = await api.createAddon(addon);
+              setAddons((previous) => [...previous, result.addon]);
+              setNotice('Add-on berhasil ditambahkan ke katalog.');
+            }}
+            onDeleteAddon={async (addon) => {
+              if (!window.confirm(`Hapus add-on "${addon.label}"? Detail transaksi lama tetap tersimpan.`)) return;
+              await api.deleteAddon(addon.id);
+              setAddons((previous) => previous.filter((entry) => entry.id !== addon.id));
+              setNotice('Add-on berhasil dihapus dari katalog.');
+            }}
+            onUpdateAddons={async (updatedAddons) => {
+              const result = await api.updateAddons(updatedAddons);
+              setAddons(result.addons);
+              setNotice('Katalog add-on berhasil diperbarui.');
             }}
             onNotice={setNotice}
           />}
@@ -553,7 +595,7 @@ function EmptyState({ title, body }) {
   return <div className="empty-state"><div className="empty-icon"><FileText size={21} /></div><strong>{title}</strong><p>{body}</p></div>;
 }
 
-function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint, savedTransaction }) {
+function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, onPrint, savedTransaction }) {
   const [location, setLocation] = useState(user.username === 'kasir2' ? 'event' : 'cafe');
   const assignedLocation = user.username === 'kasir1' ? 'cafe' : user.username === 'kasir2' ? 'event' : null;
   const activeLocation = assignedLocation || location;
@@ -566,6 +608,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
   const [guaranteePhotoFile, setGuaranteePhotoFile] = useState(null);
   const [guaranteeError, setGuaranteeError] = useState('');
   const [selectedCameraIds, setSelectedCameraIds] = useState([]);
+  const [selectedAddonIds, setSelectedAddonIds] = useState([]);
   const [cameraSettings, setCameraSettings] = useState({});
   const [startTime, setStartTime] = useState(currentTime);
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -599,9 +642,15 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       manualNote: settings.manualNote || '',
     }];
   });
+  const selectedAddons = selectedAddonIds.flatMap((addonId) => {
+    const addon = addons.find((entry) => entry.id === addonId);
+    return addon ? [addon] : [];
+  });
   const durationMinutes = selectedItems.length ? Math.max(...selectedItems.map((item) => item.durationMinutes)) : 0;
   const endTime = calcEndTime(startTime, durationMinutes);
-  const total = selectedItems.reduce((sum, item) => sum + item.price, 0);
+  const rentalSubtotal = selectedItems.reduce((sum, item) => sum + item.price, 0);
+  const addonSubtotal = selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
+  const total = rentalSubtotal + addonSubtotal;
   const normalizedWhatsapp = normalizeWhatsapp(whatsapp);
   const change = Math.max(0, Number(amountReceived) - total);
   const updateCameraSettings = (cameraId, key, value) => {
@@ -618,6 +667,17 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       ? previous.filter((id) => id !== cameraId)
       : [...previous, cameraId]);
     setErrors((previous) => ({ ...previous, camera: '' }));
+  };
+  const toggleAddon = (addon) => {
+    setSelectedAddonIds((previous) => {
+      const selected = previous.includes(addon.id);
+      if (selected) return previous.filter((id) => id !== addon.id);
+      if (addon.category !== 'property') {
+        const singleChoice = addons.find((entry) => entry.category === addon.category && previous.includes(entry.id));
+        return [...previous.filter((id) => id !== singleChoice?.id), addon.id];
+      }
+      return [...previous, addon.id];
+    });
   };
   const preview = activeTransaction || {
     receiptNo: `${activeLocation === 'event' ? 'EVT' : 'CAF'}-YYYYMMDD-000`,
@@ -638,6 +698,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       isManualPrice: item.isManualPrice,
       manualNote: item.manualNote,
     })),
+    addons: selectedAddons,
     total,
     isManualPrice: selectedItems.some((item) => item.isManualPrice),
     paymentMethod,
@@ -650,7 +711,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
   useEffect(() => {
     setSavedHere(false);
     setActiveTransaction(null);
-  }, [activeLocation, customerName, whatsapp, pagerNumber, guaranteeType, guaranteeId, guaranteeImage, guaranteePhotoFile, selectedCameraIds, cameraSettings, startTime, paymentMethod, amountReceived]);
+  }, [activeLocation, customerName, whatsapp, pagerNumber, guaranteeType, guaranteeId, guaranteeImage, guaranteePhotoFile, selectedCameraIds, selectedAddonIds, cameraSettings, startTime, paymentMethod, amountReceived]);
 
   const fieldError = (name, message) => <div className="field-error">{message || errors[name]}</div>;
   const validate = () => {
@@ -691,6 +752,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       customerPagerNumber: pagerNumber.trim(),
       guaranteeType,
       guaranteeIdNumber: guaranteeType === 'id_number' ? guaranteeId.trim() : null,
+      addonIds: selectedAddons.map((addon) => addon.id),
       cameraId: firstItem.cameraId,
       items: selectedItems.map((item) => ({
         cameraId: item.cameraId,
@@ -703,7 +765,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       durationMinutes,
       startTime,
       endTime,
-      price: total,
+      price: rentalSubtotal,
       isManualPrice: selectedItems.some((item) => item.isManualPrice),
       manualNote: selectedItems.find((item) => item.isManualPrice)?.manualNote.trim() || '',
       total,
@@ -755,6 +817,11 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
     reader.readAsDataURL(file);
   };
 
+  const addonGroups = ['property', 'photographer', 'print', 'transfer'].map((category) => ({
+    category,
+    options: addons.filter((addon) => addon.category === category),
+  })).filter((group) => group.options.length > 0);
+
   return (
     <>
       <PageHeading eyebrow="TRANSAKSI BARU" title="Buat struk sewa." description="Lengkapi detail penyewaan, lalu cek pratinjau sebelum disimpan." action={<div className="secure-note"><ShieldCheck size={15} /> Data tersimpan aman</div>} />
@@ -787,7 +854,25 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
             </div>}
           </section>
           <section className="form-section">
-            <SectionTitle number="03" title="Durasi & pembayaran" subtitle="Tentukan durasi dan tarif untuk setiap kamera" />
+            <SectionTitle number="03" title="Add-on & pemindahan file" subtitle="Pilih layanan tambahan yang diinginkan (opsional)" />
+            <div className="addon-groups">
+              {addonGroups.map(({ category, options }) => <div className="addon-group" key={category}>
+                <h3>{addonCategoryLabels[category]}</h3>
+                <div className="addon-options">
+                  {options.map((addon) => {
+                    const selected = selectedAddonIds.includes(addon.id);
+                    return <button type="button" key={addon.id} aria-pressed={selected} className={`addon-option ${selected ? 'addon-option-selected' : ''}`} onClick={() => toggleAddon(addon)}>
+                      <span className="addon-option-check">{selected && <Check size={12} />}</span>
+                      <span className="addon-option-label">{addon.label}</span>
+                      <strong>{addon.price > 0 ? formatCurrency(addon.price) : 'Gratis'}</strong>
+                    </button>;
+                  })}
+                </div>
+              </div>)}
+            </div>
+          </section>
+          <section className="form-section">
+            <SectionTitle number="04" title="Durasi & pembayaran" subtitle="Tentukan durasi dan tarif untuk setiap kamera" />
             {selectedItems.length > 0 && <div className="selected-rentals">{selectedItems.map((item) => {
               const settings = cameraSettings[item.cameraId] || { duration: '1', manualHours: '', manualMinutes: '', manualPrice: '', manualNote: '' };
               return <div className="rental-item-config" key={item.cameraId}>
@@ -802,7 +887,12 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
                 </div>}
               </div>;
             })}</div>}
-            {selectedItems.length > 1 && <div className="rental-total"><span>Total semua kamera</span><strong>{formatCurrency(total)}</strong></div>}
+            {selectedAddons.length > 0 && <div className="addon-price-summary">
+              <span>Subtotal kamera</span><strong>{formatCurrency(rentalSubtotal)}</strong>
+              {selectedAddons.map((addon) => <React.Fragment key={addon.id}><span>{addon.label}</span><strong>{addon.price > 0 ? formatCurrency(addon.price) : 'Gratis'}</strong></React.Fragment>)}
+              <span>Total transaksi</span><strong>{formatCurrency(total)}</strong>
+            </div>}
+            {selectedItems.length > 1 && selectedAddons.length === 0 && <div className="rental-total"><span>Total semua kamera</span><strong>{formatCurrency(rentalSubtotal)}</strong></div>}
             <div className="form-grid time-grid">
               <div className="form-field"><label className="field-label" htmlFor="startTime">Jam mulai <span>*</span></label><input id="startTime" className="text-input time-input" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></div>
               <div className="form-field"><label className="field-label">Jam selesai <span className="auto-tag">OTOMATIS</span></label><div className="readonly-input"><Clock3 size={16} /><strong>{endTime || '--:--'}</strong><span>{durationMinutes > 0 ? `Durasi ${Math.floor(durationMinutes / 60)}j ${durationMinutes % 60 ? `${durationMinutes % 60}m` : ''}` : 'Isi durasi'}</span></div></div>
@@ -867,12 +957,19 @@ function History({ transactions, isOwner, search, setSearch, location, setLocati
   );
 }
 
-function Catalog({ cameras, draft, setDraft, onCreate, onUpdate, onToggle, onNotice }) {
+function Catalog({ cameras, addons, draft, setDraft, onCreate, onUpdate, onToggle, onDeleteCamera, onCreateAddon, onDeleteAddon, onUpdateAddons, onNotice }) {
   const [form, setForm] = useState({ name: '', price1: '', price2: '', image: '', tone: 'pink', active: true });
+  const [addonForm, setAddonForm] = useState(addons);
+  const [newAddon, setNewAddon] = useState({ category: 'property', label: '', price: '' });
+  const [showNewAddon, setShowNewAddon] = useState(false);
   const [error, setError] = useState('');
+  const [addonError, setAddonError] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [savingAddons, setSavingAddons] = useState(false);
+  const [savingNewAddon, setSavingNewAddon] = useState(false);
   const fileRef = useRef(null);
+  useEffect(() => setAddonForm(addons), [addons]);
   useEffect(() => {
     if (draft) setForm({ name: draft.name, price1: draft.prices[1], price2: draft.prices[2], image: draft.image || '', tone: draft.tone || 'pink', active: draft.active });
     else setForm({ name: '', price1: '', price2: '', image: '', tone: 'pink', active: true });
@@ -926,6 +1023,78 @@ function Catalog({ cameras, draft, setDraft, onCreate, onUpdate, onToggle, onNot
       onNotice(toggleError.message);
     }
   };
+  const deleteCamera = async (camera) => {
+    try {
+      await onDeleteCamera(camera);
+    } catch (deleteError) {
+      setError(deleteError.message);
+      onNotice(deleteError.message);
+    }
+  };
+  const deleteAddon = async (addon) => {
+    try {
+      await onDeleteAddon(addon);
+    } catch (deleteError) {
+      setAddonError(deleteError.message);
+      onNotice(deleteError.message);
+    }
+  };
+  const updateAddonField = (id, key, value) => {
+    setAddonForm((previous) => previous.map((addon) => addon.id === id ? { ...addon, [key]: value } : addon));
+  };
+  const saveAddonCatalog = async (event) => {
+    event.preventDefault();
+    const invalidAddon = addonForm.find((addon) => !addon.label.trim()
+      || addon.price === '' || addon.price == null
+      || !Number.isSafeInteger(Number(addon.price))
+      || Number(addon.price) < 0
+      || Number(addon.price) > 100_000_000);
+    if (invalidAddon) {
+      setAddonError('Nama layanan wajib diisi dan harga harus berupa angka minimal Rp 0.');
+      return;
+    }
+    setSavingAddons(true);
+    setAddonError('');
+    try {
+      await onUpdateAddons(addonForm.map((addon) => ({
+        ...addon,
+        label: addon.label.trim(),
+        price: Number(addon.price),
+      })));
+    } catch (saveError) {
+      setAddonError(saveError.message);
+      onNotice(saveError.message);
+    } finally {
+      setSavingAddons(false);
+    }
+  };
+  const createAddon = async (event) => {
+    event.preventDefault();
+    if (!newAddon.label.trim() || newAddon.price === '' || !Number.isSafeInteger(Number(newAddon.price)) || Number(newAddon.price) < 0) {
+      setAddonError('Nama add-on wajib diisi dan harga harus berupa angka minimal Rp 0.');
+      return;
+    }
+    setSavingNewAddon(true);
+    setAddonError('');
+    try {
+      await onCreateAddon({
+        category: newAddon.category,
+        label: newAddon.label.trim(),
+        price: Number(newAddon.price),
+      });
+      setNewAddon({ category: 'property', label: '', price: '' });
+      setShowNewAddon(false);
+    } catch (saveError) {
+      setAddonError(saveError.message);
+      onNotice(saveError.message);
+    } finally {
+      setSavingNewAddon(false);
+    }
+  };
+  const addonGroups = ['property', 'photographer', 'print', 'transfer'].map((category) => ({
+    category,
+    options: addonForm.filter((addon) => addon.category === category),
+  }));
   return (
     <>
       <PageHeading eyebrow="PENGELOLAAN KATALOG" title="Kamera pilihanmu." description="Atur kamera, foto, dan tarif sewa. Perubahan hanya berlaku untuk transaksi baru." action={<button className="button button-primary" onClick={() => { setDraft(null); document.getElementById('catalog-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><Plus size={17} /> Tambah kamera</button>} />
@@ -933,7 +1102,7 @@ function Catalog({ cameras, draft, setDraft, onCreate, onUpdate, onToggle, onNot
       <div className="catalog-layout">
         <section className="catalog-list">
           <div className="section-heading catalog-section-heading"><div><h2>Daftar kamera</h2><p>Kelola kamera yang tersedia untuk disewa</p></div><span className="catalog-count">{cameras.length} ITEM</span></div>
-          <div className="catalog-grid">{cameras.map((camera) => <article className={`catalog-card ${!camera.active ? 'catalog-inactive' : ''}`} key={camera.id}><div className="catalog-camera-visual"><CameraArtwork tone={camera.tone} image={camera.image} /><span className={`catalog-status ${camera.active ? '' : 'catalog-status-off'}`}>{camera.active ? 'Aktif' : 'Nonaktif'}</span><button className="catalog-edit" onClick={() => { setDraft(camera); document.getElementById('catalog-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} aria-label={`Edit ${camera.name}`}><Settings2 size={16} /></button></div><div className="catalog-card-body"><h3>{camera.name}</h3><div className="catalog-prices"><span><small>1 JAM</small><strong>{formatCurrency(camera.prices[1])}</strong></span><i /><span><small>2 JAM</small><strong>{formatCurrency(camera.prices[2])}</strong></span></div><div className="catalog-card-footer"><button className="edit-link" onClick={() => { setDraft(camera); document.getElementById('catalog-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Edit detail <ArrowRight size={14} /></button><button className={`toggle-switch ${camera.active ? 'toggle-on' : ''}`} onClick={() => toggleActive(camera)} aria-label={camera.active ? 'Nonaktifkan kamera' : 'Aktifkan kamera'}><i /></button></div></div></article>)}</div>
+          <div className="catalog-grid">{cameras.map((camera) => <article className={`catalog-card ${!camera.active ? 'catalog-inactive' : ''}`} key={camera.id}><div className="catalog-camera-visual"><CameraArtwork tone={camera.tone} image={camera.image} /><span className={`catalog-status ${camera.active ? '' : 'catalog-status-off'}`}>{camera.active ? 'Aktif' : 'Nonaktif'}</span><button className="catalog-edit" onClick={() => { setDraft(camera); document.getElementById('catalog-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} aria-label={`Edit ${camera.name}`}><Settings2 size={16} /></button></div><div className="catalog-card-body"><h3>{camera.name}</h3><div className="catalog-prices"><span><small>1 JAM</small><strong>{formatCurrency(camera.prices[1])}</strong></span><i /><span><small>2 JAM</small><strong>{formatCurrency(camera.prices[2])}</strong></span></div><div className="catalog-card-footer"><button className="edit-link" onClick={() => { setDraft(camera); document.getElementById('catalog-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>Edit detail <ArrowRight size={14} /></button><div className="catalog-card-actions"><button className={`toggle-switch ${camera.active ? 'toggle-on' : ''}`} onClick={() => toggleActive(camera)} aria-label={camera.active ? 'Nonaktifkan kamera' : 'Aktifkan kamera'}><i /></button><button type="button" className="catalog-delete" onClick={() => deleteCamera(camera)} aria-label={`Hapus ${camera.name}`} title="Hapus kamera"><Trash2 size={14} /></button></div></div></div></article>)}</div>
         </section>
         <form id="catalog-form" className="panel catalog-form" onSubmit={saveCamera}>
           <div className="catalog-form-heading"><div className="catalog-form-icon"><Camera size={18} /></div><div><h2>{draft ? 'Edit kamera' : 'Tambah kamera'}</h2><p>{draft ? 'Perbarui detail katalog' : 'Tambahkan kamera ke katalog'}</p></div>{draft && <button type="button" className="icon-button" onClick={() => setDraft(null)} aria-label="Batal edit"><X size={17} /></button>}</div>
@@ -944,6 +1113,28 @@ function Catalog({ cameras, draft, setDraft, onCreate, onUpdate, onToggle, onNot
           <button className="button button-primary button-full catalog-save" type="submit" disabled={saving}>{draft ? <Check size={16} /> : <Plus size={16} />}{saving ? 'Menyimpan...' : draft ? 'Simpan perubahan' : 'Tambah ke katalog'}</button>
           <p className="catalog-form-note"><ShieldCheck size={14} /> Kamera nonaktif tetap tersimpan di riwayat transaksi.</p>
         </form>
+      </div>
+      <div className="panel addon-catalog-panel">
+        <div className="catalog-form-heading"><div className="catalog-form-icon"><Plus size={18} /></div><div><h2>Katalog add-on</h2><p>Atur nama, harga, dan ketersediaan layanan tambahan</p></div><button type="button" className="button button-secondary button-small" onClick={() => setShowNewAddon((visible) => !visible)}><Plus size={14} /> Tambah add-on</button></div>
+        <div className="addon-catalog-groups">
+          {addonGroups.map(({ category, options }) => <section className="addon-catalog-group" key={category}>
+            <h3>{addonCategoryLabels[category]}</h3>
+            {options.map((addon) => <div className={`addon-catalog-row ${!addon.active ? 'addon-catalog-inactive' : ''}`} key={addon.id}>
+              <input aria-label={`Nama ${addon.label}`} value={addon.label} maxLength={100} onChange={(event) => updateAddonField(addon.id, 'label', event.target.value)} />
+              <label className="addon-price-input"><span>Rp</span><input aria-label={`Harga ${addon.label}`} type="number" min="0" max="100000000" step="1" value={addon.price} onChange={(event) => updateAddonField(addon.id, 'price', event.target.value)} /></label>
+              <label className="addon-active-control"><input type="checkbox" checked={addon.active} onChange={(event) => updateAddonField(addon.id, 'active', event.target.checked)} /> Aktif</label>
+              <button type="button" className="catalog-delete addon-delete" onClick={() => deleteAddon(addon)} aria-label={`Hapus add-on ${addon.label}`} title="Hapus add-on"><Trash2 size={14} /></button>
+            </div>)}
+          </section>)}
+        </div>
+        {showNewAddon && <form className="addon-create-form" onSubmit={createAddon}>
+          <label className="addon-create-field"><span>Kategori</span><select value={newAddon.category} onChange={(event) => setNewAddon((previous) => ({ ...previous, category: event.target.value }))}><option value="property">Properti</option><option value="photographer">Fotografer</option><option value="print">Print foto</option><option value="transfer">Pemindahan file</option></select></label>
+          <label className="addon-create-field"><span>Nama layanan</span><input value={newAddon.label} maxLength={100} onChange={(event) => setNewAddon((previous) => ({ ...previous, label: event.target.value }))} placeholder="Nama produk atau layanan" /></label>
+          <label className="addon-create-field"><span>Harga</span><span className="addon-price-input"><b>Rp</b><input type="number" min="0" max="100000000" value={newAddon.price} onChange={(event) => setNewAddon((previous) => ({ ...previous, price: event.target.value }))} /></span></label>
+          <button className="button button-primary button-small" type="submit" disabled={savingNewAddon}>{savingNewAddon ? 'Menambahkan...' : 'Simpan add-on'}</button>
+        </form>}
+        {addonError && <div className="form-error">{addonError}</div>}
+        <button className="button button-primary addon-catalog-save" type="button" onClick={saveAddonCatalog} disabled={savingAddons}>{savingAddons ? 'Menyimpan...' : 'Simpan katalog add-on'}</button>
       </div>
     </>
   );

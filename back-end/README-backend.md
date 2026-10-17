@@ -70,9 +70,14 @@ All responses use JSON unless noted; errors are returned as
 | `GET` | `/api/cameras` | Login | Active catalogue; Owner also sees inactive cameras |
 | `POST` | `/api/cameras` | Owner + CSRF | Create camera (`name`, `price1`, `price2`) |
 | `PUT` | `/api/cameras/:id` | Owner + CSRF | Update name and catalogue prices |
+| `DELETE` | `/api/cameras/:id` | Owner + CSRF | Delete camera; transaction snapshots are retained |
 | `PATCH` | `/api/cameras/:id/active` | Owner + CSRF | Enable/disable a camera |
 | `POST` | `/api/cameras/:id/image` | Owner + CSRF | Upload multipart field `image` (max. 3 MB) |
 | `GET` | `/api/cameras/:id/image` | Login | Read camera image |
+| `GET` | `/api/addons` | Login | List active add-ons; Owner also sees inactive options |
+| `POST` | `/api/addons` | Owner + CSRF | Create an add-on |
+| `PUT` | `/api/addons` | Owner + CSRF | Update add-on labels, prices, and active status |
+| `DELETE` | `/api/addons/:id` | Owner + CSRF | Delete an add-on; transaction snapshots are retained |
 | `POST` | `/api/transactions` | Login + CSRF | Create transaction; JSON or multipart |
 | `GET` | `/api/transactions` | Login | Own transactions, or Owner transactions with filters |
 | `GET` | `/api/transactions/:id` | Owner or creator | Transaction detail, including own/authorized guarantee data |
@@ -91,11 +96,18 @@ one entry per camera: `cameraId`, `durationMinutes`, `price`, and
 `isManualPrice`, plus optional `manualNote`. Each item can have its own
 duration and price. Catalogue prices are rechecked for one- and two-hour
 rentals; manual prices are allowed only for durations above two hours. The
-transaction end time must match the longest item duration, and the API sums
-the item prices to validate `total`. Cash payments also require
+transaction end time must match the longest item duration. The API sums camera
+prices and selected add-on prices to validate `total`. Cash payments also require
 `amountReceived`. WhatsApp numbers are normalized before saving.
 `customerPagerNumber` is optional; when provided, it is saved with the
 transaction and included in the receipt.
+Optional `addonIds` contains selected add-on catalogue IDs. The server verifies
+the current active options and prices, allows multiple property add-ons, and
+allows at most one photographer, print, and file-transfer option per
+transaction. Add-on names and prices are snapshotted with the transaction, and
+their prices are included in the validated total. File-transfer options start
+at no charge. Owners can edit labels, prices, and availability from the
+Katalog kamera page.
 
 For a guarantee photo, send `multipart/form-data` with a JSON string in the
 `payload` field plus an optional `guaranteePhoto` file. The JSON must set

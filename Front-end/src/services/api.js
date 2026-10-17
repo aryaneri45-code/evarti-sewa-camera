@@ -66,11 +66,26 @@ export const api = {
   async cameras() {
     return request('/api/cameras');
   },
+  async addons() {
+    return request('/api/addons');
+  },
+  async updateAddons(addons) {
+    return request('/api/addons', { method: 'PUT', body: JSON.stringify({ addons }) });
+  },
+  async createAddon(addon) {
+    return request('/api/addons', { method: 'POST', body: JSON.stringify(addon) });
+  },
+  async deleteAddon(id) {
+    return request(`/api/addons/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
   async createCamera(camera) {
     return request('/api/cameras', { method: 'POST', body: JSON.stringify(camera) });
   },
   async updateCamera(id, camera) {
     return request(`/api/cameras/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(camera) });
+  },
+  async deleteCamera(id) {
+    return request(`/api/cameras/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
   async toggleCamera(id, active) {
     return request(`/api/cameras/${encodeURIComponent(id)}/active`, {

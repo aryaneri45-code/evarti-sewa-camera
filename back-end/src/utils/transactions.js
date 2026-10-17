@@ -84,6 +84,31 @@ function validateRentalItem(item, db, index) {
   };
 }
 
+function validateSelectedAddons(addonIds, db) {
+  if (!Array.isArray(addonIds) || addonIds.length > 12) {
+    throw new HttpError(400, 'Pilihan add-on tidak valid.', 'VALIDATION_ERROR');
+  }
+  if (new Set(addonIds).size !== addonIds.length || addonIds.some((id) => typeof id !== 'string')) {
+    throw new HttpError(400, 'Pilihan add-on tidak valid atau terduplikasi.', 'VALIDATION_ERROR');
+  }
+  const addons = addonIds.map((id) => {
+    const addon = db.prepare('SELECT * FROM addons WHERE id = ? AND active = 1').get(id);
+    if (!addon) throw new HttpError(400, 'Add-on tidak ditemukan atau sedang nonaktif.', 'ADDON_UNAVAILABLE');
+    return {
+      id: addon.id,
+      category: addon.category,
+      label: addon.label,
+      price: addon.price,
+    };
+  });
+  for (const category of ['photographer', 'print', 'transfer']) {
+    if (addons.filter((addon) => addon.category === category).length > 1) {
+      throw new HttpError(400, 'Pilih maksimal satu opsi fotografer, print foto, dan pemindahan file.', 'VALIDATION_ERROR');
+    }
+  }
+  return addons;
+}
+
 export function validateTransaction(input, user, db) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new HttpError(400, 'Data transaksi tidak valid.', 'VALIDATION_ERROR');
@@ -154,6 +179,12 @@ export function validateTransaction(input, user, db) {
   if (!Number.isSafeInteger(price) || price > 100_000_000) {
     throw new HttpError(400, 'Total tarif kamera melebihi batas yang diizinkan.', 'VALIDATION_ERROR');
   }
+  const addons = validateSelectedAddons(input.addonIds ?? [], db);
+  const addonTotal = addons.reduce((sum, addon) => sum + addon.price, 0);
+  const total = price + addonTotal;
+  if (!Number.isSafeInteger(total) || total > 100_000_000) {
+    throw new HttpError(400, 'Total transaksi melebihi batas yang diizinkan.', 'VALIDATION_ERROR');
+  }
   const startTime = typeof input.startTime === 'string' ? input.startTime : '';
   const expectedEndTime = computeEndTime(startTime, durationMinutes);
   const endTime = typeof input.endTime === 'string' ? input.endTime : '';
@@ -165,9 +196,8 @@ export function validateTransaction(input, user, db) {
   }
   const durationLabel = firstItem.durationLabel;
   const manualNote = items.find((item) => item.isManualPrice)?.manualNote || null;
-  const total = price;
   if (Number(input.total) !== total) {
-    throw new HttpError(400, 'Total transaksi tidak sesuai dengan tarif.', 'PRICE_MISMATCH');
+    throw new HttpError(400, 'Total transaksi tidak sesuai dengan tarif kamera dan add-on.', 'PRICE_MISMATCH');
   }
 
   const paymentMethod = input.paymentMethod;
@@ -192,6 +222,7 @@ export function validateTransaction(input, user, db) {
     guaranteeIdNumber: guaranteeType === 'id_number' ? guaranteeIdNumber : null,
     camera: firstItem.camera,
     items,
+    addons,
     durationLabel,
     durationMinutes,
     startTime,
@@ -207,7 +238,7 @@ export function validateTransaction(input, user, db) {
   };
 }
 
-export function serializeTransaction(row, { includeSensitive = false, items = [] } = {}) {
+export function serializeTransaction(row, { includeSensitive = false, items = [], addons = [] } = {}) {
   if (!row) return null;
   const transaction = {
     id: row.id,
@@ -248,6 +279,7 @@ export function serializeTransaction(row, { includeSensitive = false, items = []
       isManualPrice: Boolean(row.is_manual_price),
       manualNote: row.manual_note,
     }],
+    addons,
   };
   if (includeSensitive) {
     transaction.guaranteeType = row.guarantee_type;
