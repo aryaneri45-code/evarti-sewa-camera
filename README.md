@@ -20,7 +20,8 @@ desktop.
 - Nomor pager yang dimasukkan ikut tersimpan dan dicetak pada struk.
 - Riwayat transaksi dengan akses sesuai peran, serta fitur verifikasi
   pembayaran, pembatalan (void), dan pencatatan audit untuk aksi penting.
-- Dashboard dan ringkasan laporan; Owner dapat mengunduh ringkasan dalam PDF.
+- Dashboard dan laporan Owner dengan periode harian, mingguan, atau bulanan;
+  ringkasan dapat diunduh dalam PDF.
 - Foto kamera dan foto jaminan disimpan melalui API, dengan foto jaminan
   bersifat privat.
 
