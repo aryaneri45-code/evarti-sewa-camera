@@ -1,0 +1,183 @@
+import { HttpError } from './errors.js';
+import { normalizeWhatsapp } from './whatsapp.js';
+
+const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+export function jakartaDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function jakartaDateKey(date = new Date()) {
+  return jakartaDate(date).replaceAll('-', '');
+}
+
+export function computeEndTime(startTime, durationMinutes) {
+  if (!timePattern.test(startTime)) throw new HttpError(400, 'Jam mulai harus menggunakan format HH:MM.', 'VALIDATION_ERROR');
+  const [hour, minute] = startTime.split(':').map(Number);
+  const total = hour * 60 + minute + durationMinutes;
+  return `${String(Math.floor((total % 1440) / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+export function validateTransaction(input, user, db) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new HttpError(400, 'Data transaksi tidak valid.', 'VALIDATION_ERROR');
+  }
+  const customerName = typeof input.customerName === 'string' ? input.customerName.trim() : '';
+  if (!customerName || customerName.length > 120) {
+    throw new HttpError(400, 'Nama penyewa wajib diisi (maksimal 120 karakter).', 'VALIDATION_ERROR');
+  }
+  const customerWhatsapp = normalizeWhatsapp(input.customerWhatsapp);
+  if (!customerWhatsapp) {
+    throw new HttpError(400, 'No. WhatsApp wajib valid, diawali 08, 62, atau +62 (9-15 digit).', 'VALIDATION_ERROR');
+  }
+  const assignedLocation = user.username === 'kasir1' ? 'cafe' : user.username === 'kasir2' ? 'event' : null;
+  const location = user.role === 'owner' ? input.location : assignedLocation;
+  if (!['cafe', 'event'].includes(location)) {
+    throw new HttpError(400, 'Lokasi transaksi harus Cafe atau Event.', 'VALIDATION_ERROR');
+  }
+  const guaranteeType = input.guaranteeType || 'none';
+  if (!['none', 'photo', 'id_number'].includes(guaranteeType)) {
+    throw new HttpError(400, 'Jenis jaminan tidak valid.', 'VALIDATION_ERROR');
+  }
+  const guaranteeIdNumber = typeof input.guaranteeIdNumber === 'string' ? input.guaranteeIdNumber.trim() : '';
+  if (guaranteeType === 'id_number' && (!guaranteeIdNumber || guaranteeIdNumber.length > 120)) {
+    throw new HttpError(400, 'Nomor ID wajib diisi dan maksimal 120 karakter.', 'VALIDATION_ERROR');
+  }
+  if (guaranteeType !== 'id_number' && guaranteeIdNumber) {
+    throw new HttpError(400, 'Nomor ID hanya dapat diisi jika jenis jaminan adalah Nomor ID.', 'VALIDATION_ERROR');
+  }
+  if (guaranteeType === 'photo' && !input.guaranteePhotoPath) {
+    throw new HttpError(400, 'Foto jaminan wajib diunggah jika jenis jaminan adalah Foto.', 'VALIDATION_ERROR');
+  }
+  if (guaranteeType !== 'photo' && input.guaranteePhotoPath) {
+    throw new HttpError(400, 'Foto hanya dapat dilampirkan jika jenis jaminan adalah Foto.', 'VALIDATION_ERROR');
+  }
+
+  const camera = db.prepare('SELECT * FROM cameras WHERE id = ? AND active = 1').get(input.cameraId);
+  if (!camera) throw new HttpError(400, 'Kamera tidak ditemukan atau sedang nonaktif.', 'CAMERA_UNAVAILABLE');
+
+  const isManualPrice = input.isManualPrice === true;
+  const durationMinutes = Number(input.durationMinutes);
+  const startTime = typeof input.startTime === 'string' ? input.startTime : '';
+  if (!Number.isInteger(durationMinutes) || durationMinutes <= 0 || durationMinutes >= 1440) {
+    throw new HttpError(400, 'Durasi harus berupa bilangan menit lebih dari 0 dan kurang dari 24 jam.', 'VALIDATION_ERROR');
+  }
+  const expectedEndTime = computeEndTime(startTime, durationMinutes);
+  const endTime = typeof input.endTime === 'string' ? input.endTime : '';
+  if (!timePattern.test(endTime) || expectedEndTime !== endTime) {
+    throw new HttpError(400, 'Jam selesai tidak sesuai dengan jam mulai dan durasi.', 'VALIDATION_ERROR');
+  }
+  const durationLabel = typeof input.durationLabel === 'string' ? input.durationLabel.trim() : '';
+  if (!durationLabel || durationLabel.length > 40) {
+    throw new HttpError(400, 'Label durasi wajib diisi dan maksimal 40 karakter.', 'VALIDATION_ERROR');
+  }
+
+  let price;
+  let manualNote = '';
+  if (isManualPrice) {
+    if (durationMinutes <= 120) {
+      throw new HttpError(400, 'Tarif manual hanya berlaku untuk durasi lebih dari 2 jam.', 'VALIDATION_ERROR');
+    }
+    price = Number(input.price);
+    if (!Number.isSafeInteger(price) || price <= 0 || price > 100_000_000) {
+      throw new HttpError(400, 'Tarif manual wajib berupa nominal rupiah positif yang valid.', 'VALIDATION_ERROR');
+    }
+    manualNote = typeof input.manualNote === 'string' ? input.manualNote.trim() : '';
+    if (manualNote.length > 500) throw new HttpError(400, 'Catatan tarif manual maksimal 500 karakter.', 'VALIDATION_ERROR');
+  } else {
+    if (![60, 120].includes(durationMinutes)) {
+      throw new HttpError(400, 'Durasi di atas 2 jam harus ditandai sebagai tarif manual.', 'VALIDATION_ERROR');
+    }
+    price = durationMinutes === 60 ? camera.price_1h : camera.price_2h;
+    if (Number(input.price) !== price) {
+      throw new HttpError(400, 'Harga tidak sesuai dengan tarif kamera di katalog.', 'PRICE_MISMATCH');
+    }
+  }
+  const total = price;
+  if (Number(input.total) !== total) {
+    throw new HttpError(400, 'Total transaksi tidak sesuai dengan tarif.', 'PRICE_MISMATCH');
+  }
+
+  const paymentMethod = input.paymentMethod;
+  if (!['cash', 'qris_dana'].includes(paymentMethod)) {
+    throw new HttpError(400, 'Metode pembayaran tidak valid.', 'VALIDATION_ERROR');
+  }
+  const amountReceived = paymentMethod === 'cash' ? Number(input.amountReceived) : total;
+  if (!Number.isSafeInteger(amountReceived) || amountReceived < 0) {
+    throw new HttpError(400, 'Jumlah pembayaran tidak valid.', 'VALIDATION_ERROR');
+  }
+  if (paymentMethod === 'cash' && amountReceived < total) {
+    throw new HttpError(400, 'Uang diterima tidak boleh kurang dari total.', 'INSUFFICIENT_PAYMENT');
+  }
+
+  return {
+    location,
+    customerName,
+    customerWhatsapp,
+    guaranteeType,
+    guaranteePhotoPath: input.guaranteePhotoPath || null,
+    guaranteeIdNumber: guaranteeType === 'id_number' ? guaranteeIdNumber : null,
+    camera,
+    durationLabel,
+    durationMinutes,
+    startTime,
+    endTime,
+    price,
+    isManualPrice,
+    manualNote: isManualPrice ? manualNote : null,
+    total,
+    paymentMethod,
+    amountReceived,
+    changeAmount: paymentMethod === 'cash' ? amountReceived - total : 0,
+    paymentStatus: paymentMethod === 'cash' ? 'paid' : 'pending_verification',
+  };
+}
+
+export function serializeTransaction(row, { includeSensitive = false } = {}) {
+  if (!row) return null;
+  const transaction = {
+    id: row.id,
+    receiptNo: row.receipt_no,
+    cashierId: row.cashier_username,
+    cashierName: row.cashier_name,
+    location: row.location,
+    customerName: row.customer_name,
+    customerWhatsapp: row.customer_whatsapp,
+    cameraId: row.camera_id,
+    cameraName: row.camera_name,
+    durationLabel: row.duration_label,
+    durationMinutes: row.duration_minutes,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    price: row.price,
+    isManualPrice: Boolean(row.is_manual_price),
+    manualNote: row.manual_note,
+    total: row.total,
+    paymentMethod: row.payment_method,
+    amountReceived: row.amount_received,
+    change: row.change_amount,
+    paymentStatus: row.payment_status,
+    verifiedBy: row.verified_by_name,
+    verifiedAt: row.verified_at,
+    voidedBy: row.voided_by_name,
+    voidedAt: row.voided_at,
+    voidReason: row.void_reason,
+    createdAt: row.created_at,
+    printedCount: row.printed_count,
+  };
+  if (includeSensitive) {
+    transaction.guaranteeType = row.guarantee_type;
+    transaction.guaranteeIdNumber = row.guarantee_id_number;
+    transaction.guaranteePhotoUrl = row.guarantee_photo_path
+      ? `/api/transactions/${encodeURIComponent(row.id)}/guarantee-photo`
+      : null;
+  }
+  return transaction;
+}

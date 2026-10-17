@@ -1,0 +1,140 @@
+import Database from 'better-sqlite3';
+import bcrypt from 'bcryptjs';
+import fs from 'node:fs';
+import path from 'node:path';
+
+export const initialCameras = [
+  { id: 'casio', name: 'Casio', price1h: 12000, price2h: 15000 },
+  { id: 'olympus-tough-8010', name: 'Olympus Tough - 8010', price1h: 15000, price2h: 20000 },
+  { id: 'sony-cybershot-810', name: 'Sony Cybershot 810', price1h: 20000, price2h: 30000 },
+  { id: 'canon-ixus-185', name: 'Canon Ixus 185', price1h: 25000, price2h: 35000 },
+  { id: 'lumix-fx520', name: 'Lumix FX520', price1h: 30000, price2h: 40000 },
+  { id: 'canon-ixus-285', name: 'Canon Ixus 285', price1h: 35000, price2h: 50000 },
+];
+
+const schema = `
+  PRAGMA foreign_keys = ON;
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('owner', 'kasir')),
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    csrf_token TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+  CREATE TABLE IF NOT EXISTS cameras (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    image_path TEXT,
+    price_1h INTEGER NOT NULL CHECK (price_1h > 0),
+    price_2h INTEGER NOT NULL CHECK (price_2h > 0),
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS receipt_sequences (
+    location_prefix TEXT NOT NULL,
+    receipt_date TEXT NOT NULL,
+    last_number INTEGER NOT NULL,
+    PRIMARY KEY (location_prefix, receipt_date)
+  );
+  CREATE TABLE IF NOT EXISTS transactions (
+    id TEXT PRIMARY KEY,
+    receipt_no TEXT NOT NULL UNIQUE,
+    cashier_id TEXT NOT NULL REFERENCES users(id),
+    location TEXT NOT NULL CHECK (location IN ('cafe', 'event')),
+    customer_name TEXT NOT NULL,
+    customer_whatsapp TEXT NOT NULL,
+    guarantee_type TEXT NOT NULL CHECK (guarantee_type IN ('none', 'photo', 'id_number')),
+    guarantee_photo_path TEXT,
+    guarantee_id_number TEXT,
+    camera_id TEXT REFERENCES cameras(id) ON DELETE SET NULL,
+    camera_name TEXT NOT NULL,
+    duration_label TEXT NOT NULL,
+    duration_minutes INTEGER NOT NULL CHECK (duration_minutes > 0),
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    price INTEGER NOT NULL CHECK (price > 0),
+    is_manual_price INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_price IN (0, 1)),
+    manual_note TEXT,
+    total INTEGER NOT NULL CHECK (total > 0),
+    payment_method TEXT NOT NULL CHECK (payment_method IN ('cash', 'qris_dana')),
+    amount_received INTEGER NOT NULL CHECK (amount_received >= 0),
+    change_amount INTEGER NOT NULL CHECK (change_amount >= 0),
+    payment_status TEXT NOT NULL CHECK (payment_status IN ('paid', 'pending_verification', 'void')),
+    verified_by TEXT REFERENCES users(id),
+    verified_at TEXT,
+    voided_by TEXT REFERENCES users(id),
+    voided_at TEXT,
+    void_reason TEXT,
+    printed_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS transactions_cashier_created_idx ON transactions(cashier_id, created_at);
+  CREATE INDEX IF NOT EXISTS transactions_location_created_idx ON transactions(location, created_at);
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    action TEXT NOT NULL,
+    transaction_id TEXT REFERENCES transactions(id),
+    detail TEXT,
+    created_at TEXT NOT NULL
+  );
+`;
+
+export function createDatabase({ filename = './.data/evarti.sqlite', passwords, database } = {}) {
+  if (!database && filename !== ':memory:') {
+    const directory = path.dirname(path.resolve(filename));
+    fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  }
+  const db = database || new Database(filename);
+  if (!database && filename !== ':memory:' && process.platform !== 'win32') {
+    fs.chmodSync(path.resolve(filename), 0o600);
+  }
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.exec(schema);
+  seedDatabase(db, passwords);
+  return db;
+}
+
+export function seedDatabase(db, passwords = {}) {
+  const count = db.prepare('SELECT COUNT(*) AS count FROM users').get().count;
+  if (count === 0) {
+    const accounts = [
+      { id: 'owner', username: 'owner', name: 'Ariani Putri', role: 'owner', password: passwords.owner },
+      { id: 'kasir1', username: 'kasir1', name: 'Nadia Safitri', role: 'kasir', password: passwords.cashier1 },
+      { id: 'kasir2', username: 'kasir2', name: 'Raka Pratama', role: 'kasir', password: passwords.cashier2 },
+    ];
+    if (accounts.some((account) => !account.password || account.password.length < 12)) {
+      throw new Error('Password bootstrap Owner, Kasir 1, dan Kasir 2 harus diatur (minimal 12 karakter).');
+    }
+    const insertUser = db.prepare(
+      'INSERT INTO users (id, username, password_hash, role, name) VALUES (?, ?, ?, ?, ?)',
+    );
+    const seedUsers = db.transaction(() => {
+      for (const account of accounts) {
+        insertUser.run(account.id, account.username, bcrypt.hashSync(account.password, 12), account.role, account.name);
+      }
+    });
+    seedUsers();
+  }
+  const insertCamera = db.prepare(
+    'INSERT OR IGNORE INTO cameras (id, name, price_1h, price_2h, active) VALUES (?, ?, ?, ?, 1)',
+  );
+  for (const camera of initialCameras) {
+    insertCamera.run(camera.id, camera.name, camera.price1h, camera.price2h);
+  }
+}
+
+export function closeDatabase(db) {
+  if (db?.open) db.close();
+}

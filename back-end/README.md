@@ -1,0 +1,116 @@
+# Evarti backend
+
+REST API for the Evarti rental MVP. Uses Express and SQLite; SQLite keeps local
+development self-contained and can be replaced with PostgreSQL/MySQL if the
+deployment needs a shared database or higher write concurrency.
+
+## Requirements and local setup
+
+- Node.js 20 or newer
+- npm
+
+```sh
+cd ..
+cp .env.example .env
+```
+
+Set unique passwords of at least 12 characters for all three accounts and a
+random `SESSION_SECRET` of at least 32 characters in `.env`. For example, use
+`openssl rand -base64 48` to generate a session secret. Do not commit `.env`.
+
+```sh
+npm install
+npm run dev
+```
+
+`npm run dev` from the project root starts the frontend and API together. The
+backend can be run separately with `npm run dev:backend` from the project root.
+The default API URL is `http://localhost:3000`. On first launch the API creates
+the SQLite database and seeds the six PRD camera models plus the three accounts:
+
+| Username | Role | Assigned transaction location |
+|---|---|---|
+| `owner` | Owner | Cafe or Event, selected per transaction |
+| `kasir1` | Kasir 1 | Cafe, enforced by the API |
+| `kasir2` | Kasir 2 | Event, enforced by the API |
+
+All initial account passwords come from environment variables. Changing those
+variables after the accounts have been seeded does not reset existing password
+hashes; use an account-management migration/tool before deployment to rotate
+credentials.
+
+## Session and request security
+
+- Login creates a random server-side session with an eight-hour expiry and sets
+  an `HttpOnly`, `SameSite=Strict` cookie.
+- `POST`, `PUT`, and `PATCH` requests require the `X-CSRF-Token` returned by
+  login or `GET /api/auth/me`.
+- The frontend origin must be listed in `FRONTEND_ORIGIN` (comma-separated when
+  multiple origins are needed).
+- Production requires HTTPS and `COOKIE_SECURE=true`.
+- Passwords are stored as bcrypt hashes. Login attempts are rate-limited.
+- The SQLite database file is created with owner-only permissions, and upload
+  directories are not publicly exposed.
+- Cashiers only list/read their own transactions. Owner-only camera changes,
+  voids, reports, and audit-log access are enforced by the API.
+- Guarantee images are stored outside the public directory and served only via
+  an authorized transaction endpoint. Camera and guarantee uploads are limited
+  to JPG/PNG/WebP and checked against the file signature.
+
+## API overview
+
+All responses use JSON unless noted; errors are returned as
+`{ "error": { "code": "...", "message": "..." } }`.
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Public, rate-limited | Login; returns user, CSRF token, expiry |
+| `POST` | `/api/auth/logout` | Login + CSRF | End current session |
+| `GET` | `/api/auth/me` | Login | Current user and CSRF token |
+| `GET` | `/api/cameras` | Login | Active catalogue; Owner also sees inactive cameras |
+| `POST` | `/api/cameras` | Owner + CSRF | Create camera (`name`, `price1`, `price2`) |
+| `PUT` | `/api/cameras/:id` | Owner + CSRF | Update name and catalogue prices |
+| `PATCH` | `/api/cameras/:id/active` | Owner + CSRF | Enable/disable a camera |
+| `POST` | `/api/cameras/:id/image` | Owner + CSRF | Upload multipart field `image` (max. 3 MB) |
+| `GET` | `/api/cameras/:id/image` | Login | Read camera image |
+| `POST` | `/api/transactions` | Login + CSRF | Create transaction; JSON or multipart |
+| `GET` | `/api/transactions` | Login | Own transactions, or Owner transactions with filters |
+| `GET` | `/api/transactions/:id` | Owner or creator | Transaction detail, including own/authorized guarantee data |
+| `GET` | `/api/transactions/:id/guarantee-photo` | Owner or creator | Private guarantee photo |
+| `PATCH` | `/api/transactions/:id/verify` | Owner or creator + CSRF | Verify pending QRIS payment |
+| `PATCH` | `/api/transactions/:id/void` | Owner + CSRF | Void transaction; requires reason |
+| `POST` | `/api/transactions/:id/print` | Owner or creator + CSRF | Record a print/reprint |
+| `GET` | `/api/reports/summary` | Login | Summary; Owner can filter cashier/location/date |
+| `GET` | `/api/reports/summary/pdf` | Owner | Download summary PDF |
+| `GET` | `/api/audit-logs` | Owner | Recent sensitive-action audit logs |
+
+Transaction creation expects `customerName`, `customerWhatsapp`, `cameraId`,
+`durationLabel`, `durationMinutes`, `startTime`, `endTime`, `price`,
+`isManualPrice`, `total`, and `paymentMethod`; `location` is required for Owner
+but ignored and assigned by the server for cashiers. Cash payments also require
+`amountReceived`. For manual duration, set `isManualPrice: true` and provide a
+positive manual `price` and `total`; duration must exceed 120 minutes. The API
+rechecks catalogue prices for one- and two-hour rentals and normalizes WhatsApp
+numbers before saving.
+
+For a guarantee photo, send `multipart/form-data` with a JSON string in the
+`payload` field plus an optional `guaranteePhoto` file. The JSON must set
+`guaranteeType` to `photo`. The file limit is 2 MB. ID-number guarantees use
+`guaranteeType: "id_number"` and `guaranteeIdNumber` in JSON; `none` is allowed.
+Sensitive guarantee values are omitted from transaction list responses and are
+never included in receipt/print responses.
+
+List filters include `location=cafe|event`, `date=YYYY-MM-DD`, `status`, and
+`manual=true|false`. Owner may also use `cashier=kasir1|kasir2`; cashiers cannot
+override their own-user scope. `limit` (max 100) and `offset` are supported.
+Reports accept `from` and `to` dates, or a single `date`.
+
+## Tests
+
+```sh
+npm test
+```
+
+Tests use in-memory SQLite databases and temporary upload directories. This API
+is not yet connected to the frontend; configure the frontend API client to use
+the endpoints above and send credentials plus the CSRF header before deploying.
