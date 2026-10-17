@@ -67,13 +67,13 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
         const receipt = `${prefix}-${receiptDate}-${String(sequence).padStart(3, '0')}`;
         db.prepare(`
           INSERT INTO transactions (
-            id, receipt_no, cashier_id, location, customer_name, customer_whatsapp,
+            id, receipt_no, cashier_id, location, customer_name, customer_whatsapp, customer_pager_number,
             guarantee_type, guarantee_photo_path, guarantee_id_number,
             camera_id, camera_name, duration_label, duration_minutes, start_time, end_time,
             price, is_manual_price, manual_note, total, payment_method, amount_received,
             change_amount, payment_status, verified_by, verified_at, printed_count, created_at
           ) VALUES (
-            @id, @receiptNo, @cashierId, @location, @customerName, @customerWhatsapp,
+            @id, @receiptNo, @cashierId, @location, @customerName, @customerWhatsapp, @customerPagerNumber,
             @guaranteeType, @guaranteePhotoPath, @guaranteeIdNumber,
             @cameraId, @cameraName, @durationLabel, @durationMinutes, @startTime, @endTime,
             @price, @isManualPrice, @manualNote, @total, @paymentMethod, @amountReceived,
@@ -86,6 +86,7 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
           location: transactionData.location,
           customerName: transactionData.customerName,
           customerWhatsapp: transactionData.customerWhatsapp,
+          customerPagerNumber: transactionData.customerPagerNumber,
           guaranteeType: transactionData.guaranteeType,
           guaranteePhotoPath: transactionData.guaranteePhotoPath,
           guaranteeIdNumber: transactionData.guaranteeIdNumber,

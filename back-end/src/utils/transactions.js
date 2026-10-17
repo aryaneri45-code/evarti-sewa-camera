@@ -37,6 +37,17 @@ export function validateTransaction(input, user, db) {
   if (!customerWhatsapp) {
     throw new HttpError(400, 'No. WhatsApp wajib valid, diawali 08, 62, atau +62 (9-15 digit).', 'VALIDATION_ERROR');
   }
+  const customerPagerNumber = input.customerPagerNumber == null || input.customerPagerNumber === ''
+    ? null
+    : typeof input.customerPagerNumber === 'string'
+      ? input.customerPagerNumber.trim()
+      : null;
+  if (input.customerPagerNumber != null && typeof input.customerPagerNumber !== 'string') {
+    throw new HttpError(400, 'Nomor pager harus berupa teks.', 'VALIDATION_ERROR');
+  }
+  if (customerPagerNumber && customerPagerNumber.length > 40) {
+    throw new HttpError(400, 'Nomor pager maksimal 40 karakter.', 'VALIDATION_ERROR');
+  }
   const assignedLocation = user.username === 'kasir1' ? 'cafe' : user.username === 'kasir2' ? 'event' : null;
   const location = user.role === 'owner' ? input.location : assignedLocation;
   if (!['cafe', 'event'].includes(location)) {
@@ -121,6 +132,7 @@ export function validateTransaction(input, user, db) {
     location,
     customerName,
     customerWhatsapp,
+    customerPagerNumber: customerPagerNumber || null,
     guaranteeType,
     guaranteePhotoPath: input.guaranteePhotoPath || null,
     guaranteeIdNumber: guaranteeType === 'id_number' ? guaranteeIdNumber : null,
@@ -150,6 +162,7 @@ export function serializeTransaction(row, { includeSensitive = false } = {}) {
     location: row.location,
     customerName: row.customer_name,
     customerWhatsapp: row.customer_whatsapp,
+    customerPagerNumber: row.customer_pager_number,
     cameraId: row.camera_id,
     cameraName: row.camera_name,
     durationLabel: row.duration_label,

@@ -11,9 +11,11 @@ desktop.
 - Katalog kamera dengan harga sewa 1 jam dan 2 jam; Owner dapat mengelola
   kamera, harga, foto, dan status aktif.
 - Pembuatan transaksi dengan data penyewa, nomor WhatsApp, durasi, lokasi,
-  metode pembayaran, dan informasi jaminan opsional.
+  nomor pager opsional sebagai pengingat waktu sewa, metode pembayaran, dan
+  informasi jaminan opsional.
 - Tarif dan durasi manual untuk penyewaan lebih dari 2 jam.
 - Pratinjau, penyimpanan, cetak, dan cetak ulang struk thermal 58 mm.
+- Nomor pager yang dimasukkan ikut tersimpan dan dicetak pada struk.
 - Riwayat transaksi dengan akses sesuai peran, serta fitur verifikasi
   pembayaran, pembatalan (void), dan pencatatan audit untuk aksi penting.
 - Dashboard dan ringkasan laporan; Owner dapat mengunduh ringkasan dalam PDF.

@@ -53,6 +53,7 @@ const schema = `
     location TEXT NOT NULL CHECK (location IN ('cafe', 'event')),
     customer_name TEXT NOT NULL,
     customer_whatsapp TEXT NOT NULL,
+    customer_pager_number TEXT,
     guarantee_type TEXT NOT NULL CHECK (guarantee_type IN ('none', 'photo', 'id_number')),
     guarantee_photo_path TEXT,
     guarantee_id_number TEXT,
@@ -102,6 +103,10 @@ export function createDatabase({ filename = './.data/evarti.sqlite', passwords, 
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(schema);
+  const transactionColumns = db.pragma('table_info(transactions)');
+  if (!transactionColumns.some((column) => column.name === 'customer_pager_number')) {
+    db.exec('ALTER TABLE transactions ADD COLUMN customer_pager_number TEXT');
+  }
   seedDatabase(db, passwords);
   return db;
 }

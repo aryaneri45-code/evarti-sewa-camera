@@ -91,7 +91,8 @@ but ignored and assigned by the server for cashiers. Cash payments also require
 `amountReceived`. For manual duration, set `isManualPrice: true` and provide a
 positive manual `price` and `total`; duration must exceed 120 minutes. The API
 rechecks catalogue prices for one- and two-hour rentals and normalizes WhatsApp
-numbers before saving.
+numbers before saving. `customerPagerNumber` is optional; when provided, it is
+saved with the transaction and included in the receipt.
 
 For a guarantee photo, send `multipart/form-data` with a JSON string in the
 `payload` field plus an optional `guaranteePhoto` file. The JSON must set

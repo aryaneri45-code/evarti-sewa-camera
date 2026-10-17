@@ -84,6 +84,7 @@ Field input:
 | Lokasi | Pilihan | Cafe / Event |
 | Nama Penyewa | Teks | Wajib |
 | No. WhatsApp | Teks angka | Wajib; ditampilkan di pratinjau dan struk |
+| Nomor Pager | Teks | Opsional; nomor perangkat pengingat waktu sewa, ditampilkan di pratinjau dan struk jika diisi |
 | Jaminan | Pilihan | Opsional, ditentukan kasir yang bertugas: Tidak ada / Foto / Nomor ID |
 | Foto Jaminan | Upload gambar | Muncul jika jaminan = Foto; bisa ambil langsung dari kamera HP |
 | Nomor ID | Teks | Muncul jika jaminan = Nomor ID |
@@ -165,6 +166,7 @@ Jam Mulai                  06:40
 Jam Selesai                08:40
 Penyewa                    aryan
 No. WA               081234567890
+No. Pager                  P-07
 --------------------------------
 Kamera                     Casio
 Durasi                     2 Jam
@@ -192,6 +194,7 @@ Kembali                     Rp 0
 - **No. Struk:** `PREFIX-YYYYMMDD-NNN` dengan awalan dibedakan per lokasi: **`EVT`** untuk Event dan **`CAF`** untuk Cafe (contoh: `EVT-20261017-001`, `CAF-20261017-001`). Nomor urut berjalan harian per awalan dan reset setiap hari.
 - Footer: kebijakan denda & tanggung jawab, akun media sosial, dan ucapan terima kasih.
 - Baris **No. WA** selalu tampil tepat di bawah baris Penyewa. Gambar referensi struk awal belum memuat baris ini, jadi layout final mengikuti gambar tersebut dengan tambahan baris No. WA.
+- Nomor pager ditampilkan lengkap di bawah No. WA jika diisi; nomor ini membantu kasir mengenali perangkat pengingat saat waktu sewa habis.
 - Untuk pembayaran QRIS: baris "Bayar" menampilkan `QRIS DANA`, baris Diterima/Kembali disembunyikan atau tampil sama dengan total/Rp 0.
 - Untuk tarif manual: tampil keterangan "Tarif Manual" pada baris Harga.
 
@@ -224,7 +227,7 @@ Kembali                     Rp 0
 **cameras:** `id, name, image, price_1h, price_2h, active`
 
 **transactions:**
-`id, receipt_no, cashier_id, location (cafe|event), customer_name, customer_whatsapp (required), guarantee_type (none|photo|id_number), guarantee_photo (nullable), guarantee_id_number (nullable), camera_id, camera_name (snapshot), duration_label, start_time, end_time, price, is_manual_price, manual_note, total, payment_method (cash|qris_dana), amount_received, change, payment_status (paid|pending_verification|void), verified_by, verified_at, created_at, printed_count`
+`id, receipt_no, cashier_id, location (cafe|event), customer_name, customer_whatsapp (required), customer_pager_number (nullable), guarantee_type (none|photo|id_number), guarantee_photo (nullable), guarantee_id_number (nullable), camera_id, camera_name (snapshot), duration_label, start_time, end_time, price, is_manual_price, manual_note, total, payment_method (cash|qris_dana), amount_received, change, payment_status (paid|pending_verification|void), verified_by, verified_at, created_at, printed_count`
 
 **audit_logs:** `id, user_id, action, transaction_id, detail, created_at`
 

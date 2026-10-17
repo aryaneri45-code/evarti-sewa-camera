@@ -147,6 +147,7 @@ function Receipt({ transaction }) {
       <div className="receipt-row"><span>Jam Selesai</span><b>{transaction.endTime}</b></div>
       <div className="receipt-row"><span>Penyewa</span><b>{transaction.customerName || 'Nama penyewa'}</b></div>
       <div className="receipt-row"><span>No. WA</span><b>{transaction.customerWhatsapp || '08xxxxxxxxxx'}</b></div>
+      {transaction.customerPagerNumber && <div className="receipt-row"><span>No. Pager</span><b>{transaction.customerPagerNumber}</b></div>}
       <div className="receipt-rule" />
       <div className="receipt-row"><span>Kamera</span><b>{transaction.cameraName || 'Pilih kamera'}</b></div>
       <div className="receipt-row"><span>Durasi</span><b>{transaction.durationLabel}</b></div>
@@ -485,6 +486,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
   const activeLocation = assignedLocation || location;
   const [customerName, setCustomerName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [pagerNumber, setPagerNumber] = useState('');
   const [guaranteeType, setGuaranteeType] = useState('none');
   const [guaranteeId, setGuaranteeId] = useState('');
   const [guaranteeImage, setGuaranteeImage] = useState('');
@@ -515,6 +517,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
     endTime,
     customerName,
     customerWhatsapp: normalizedWhatsapp || whatsapp || '',
+    customerPagerNumber: pagerNumber.trim(),
     cameraName: selected?.name || '',
     durationLabel: duration === 'manual' ? `${manualHours || 0} jam ${manualMinutes || 0} mnt` : `${duration} Jam`,
     total,
@@ -529,7 +532,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
   useEffect(() => {
     setSavedHere(false);
     setActiveTransaction(null);
-  }, [activeLocation, customerName, whatsapp, guaranteeType, guaranteeId, guaranteeImage, guaranteePhotoFile, selectedCamera, duration, manualHours, manualMinutes, manualPrice, manualNote, startTime, paymentMethod, amountReceived]);
+  }, [activeLocation, customerName, whatsapp, pagerNumber, guaranteeType, guaranteeId, guaranteeImage, guaranteePhotoFile, selectedCamera, duration, manualHours, manualMinutes, manualPrice, manualNote, startTime, paymentMethod, amountReceived]);
 
   const fieldError = (name, message) => <div className="field-error">{message || errors[name]}</div>;
   const validate = () => {
@@ -563,6 +566,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
       location: activeLocation,
       customerName: customerName.trim(),
       customerWhatsapp: normalizedWhatsapp,
+      customerPagerNumber: pagerNumber.trim(),
       guaranteeType,
       guaranteeIdNumber: guaranteeType === 'id_number' ? guaranteeId.trim() : null,
       cameraId: selected.id,
@@ -637,6 +641,7 @@ function CreateTransaction({ user, cameras, onSave, onVerify, onNotice, onPrint,
               </div>}</div>
               <div className="form-field"><label className="field-label" htmlFor="customerName">Nama penyewa <span>*</span></label><input id="customerName" className={`text-input ${errors.customerName ? 'input-invalid' : ''}`} value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Contoh: Alya Putri" />{errors.customerName && fieldError('customerName')}</div>
               <div className="form-field"><label className="field-label" htmlFor="whatsapp">No. WhatsApp <span>*</span></label><div className={`phone-input ${errors.whatsapp ? 'input-invalid' : ''}`}><input id="whatsapp" value={whatsapp} onChange={(event) => { setWhatsapp(event.target.value); setErrors((previous) => ({ ...previous, whatsapp: '' })); }} placeholder="08xxxxxxxxxx atau +628..." inputMode="tel" /></div>{errors.whatsapp ? fieldError('whatsapp') : <small className="field-hint">Gunakan format 08, 62, atau +62. Nomor dinormalisasi saat disimpan.</small>}</div>
+              <div className="form-field"><label className="field-label" htmlFor="pagerNumber">Nomor pager <span className="optional-tag">OPSIONAL</span></label><input id="pagerNumber" className="text-input" value={pagerNumber} onChange={(event) => setPagerNumber(event.target.value)} placeholder="Nomor pager untuk pengingat waktu sewa" maxLength={40} /></div>
               <div className="form-field full-field"><label className="field-label">Jaminan <span className="optional-tag">OPSIONAL</span></label><div className="guarantee-options">
                 {[['none', 'Tidak ada'], ['photo', 'Foto'], ['id_number', 'Nomor ID']].map(([value, label]) => <button key={value} type="button" onClick={() => { setGuaranteeType(value); setGuaranteeError(''); }} className={`pill-option ${guaranteeType === value ? 'pill-option-active' : ''}`}>{guaranteeType === value && <Check size={13} />}{label}</button>)}
               </div></div>

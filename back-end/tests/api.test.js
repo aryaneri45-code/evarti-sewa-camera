@@ -108,11 +108,12 @@ test('cashier location is enforced by role and cashier data is isolated', async 
 
   const created = await cashierOne.agent.post('/api/transactions')
     .set('X-CSRF-Token', cashierOne.csrfToken)
-    .send(rentalPayload({ location: 'event' }));
+    .send(rentalPayload({ location: 'event', customerPagerNumber: 'P-07' }));
   assert.equal(created.status, 201);
   assert.equal(created.body.transaction.location, 'cafe');
   assert.match(created.body.transaction.receiptNo, /^CAF-\d{8}-001$/);
   assert.equal(created.body.transaction.customerWhatsapp, '081234567890');
+  assert.equal(created.body.transaction.customerPagerNumber, 'P-07');
 
   const eventCreated = await cashierTwo.agent.post('/api/transactions')
     .set('X-CSRF-Token', cashierTwo.csrfToken)
@@ -126,9 +127,26 @@ test('cashier location is enforced by role and cashier data is isolated', async 
   assert.equal(cashierOneList.body.transactions.length, 1);
   assert.equal(cashierTwoList.body.transactions.length, 1);
   assert.equal(cashierOneList.body.transactions[0].customerName, 'Alya Putri');
+  assert.equal(cashierOneList.body.transactions[0].customerPagerNumber, 'P-07');
   assert.equal(cashierTwoList.body.transactions[0].customerName, 'Rani');
   assert.equal((await cashierTwo.agent.get(`/api/transactions/${created.body.transaction.id}`)).status, 404);
   assert.equal((await cashierOne.agent.get('/api/cameras')).body.cameras.length, 6);
+});
+
+test('pager number is optional and limited to 40 characters', async () => {
+  const app = makeApp();
+  const cashier = await login(app, 'kasir1');
+  const withoutPager = await cashier.agent.post('/api/transactions')
+    .set('X-CSRF-Token', cashier.csrfToken)
+    .send(rentalPayload());
+  assert.equal(withoutPager.status, 201);
+  assert.equal(withoutPager.body.transaction.customerPagerNumber, null);
+
+  const tooLong = await cashier.agent.post('/api/transactions')
+    .set('X-CSRF-Token', cashier.csrfToken)
+    .send(rentalPayload({ customerPagerNumber: 'P'.repeat(41) }));
+  assert.equal(tooLong.status, 400);
+  assert.equal(tooLong.body.error.code, 'VALIDATION_ERROR');
 });
 
 test('server validates catalog prices, WhatsApp, manual duration and cash payment', async () => {
