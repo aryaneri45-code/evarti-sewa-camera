@@ -66,8 +66,7 @@ function CameraArtwork({ tone = 'pink', image, large = false }) {
 function Brand({ compact = false }) {
   return (
     <div className={`brand ${compact ? 'brand-compact' : ''}`}>
-      <div className="brand-mark"><Camera size={19} strokeWidth={1.8} /></div>
-      {!compact && <div><div className="brand-name">evarti<span>.</span></div><div className="brand-tagline">WEAVING STORIES INTO YOUR LIFE</div></div>}
+      <img className="brand-logo" src="/evarti-logo.png" alt="Evarti — Weaving stories into your life" />
     </div>
   );
 }
@@ -149,6 +148,7 @@ function Receipt({ transaction, variant = 'customer' }) {
   if (variant === 'admin') {
     return (
       <div className="receipt-paper receipt-admin">
+        <img className="receipt-logo" src="/evarti-logo.png" alt="Evarti — Weaving stories into your life" />
         <div className="receipt-admin-title">NEW ORDER</div>
         <div className="receipt-rule" />
         <div className="receipt-row"><span>No. Struk</span><b>{transaction.receiptNo}</b></div>
@@ -167,8 +167,7 @@ function Receipt({ transaction, variant = 'customer' }) {
   }
   return (
     <div className="receipt-paper">
-      <div className="receipt-brand">evarti</div>
-      <div className="receipt-tagline">Weaving stories into your life</div>
+      <img className="receipt-logo" src="/evarti-logo.png" alt="Evarti — Weaving stories into your life" />
       <div className="receipt-rule" />
       <div className="receipt-row"><span>No. Struk</span><b>{transaction.receiptNo}</b></div>
       <div className="receipt-row"><span>Tanggal</span><b>{new Intl.DateTimeFormat('id-ID').format(new Date(transaction.createdAt))}</b></div>
