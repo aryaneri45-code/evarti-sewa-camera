@@ -157,9 +157,7 @@ Field input:
 
 ## 5.1 Format Struk admin
 
-Struk admin adalah salinan internal untuk membantu kasir dan tim operasional
-mengenali pesanan serta mengingat detail waktu sewa. Format ini dicetak
-terpisah dari struk pelanggan.
+Struk admin adalah salinan internal untuk membantu kasir dan tim operasional. mengenali pesanan serta mengingat detail waktu sewa. Format ini dicetak terpisah dari struk pelanggan.
 
 ```text
             NEW ORDER
