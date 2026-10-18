@@ -10,9 +10,9 @@ import {
 import { api, assetUrl, imageCredentials } from './services/api.js';
 
 const demoUsers = [
-  { username: 'owner', name: 'Ariani Putri', role: 'owner', title: 'Owner' },
-  { username: 'kasir1', name: 'Nadia Safitri', role: 'kasir', title: 'Kasir 1' },
-  { username: 'kasir2', name: 'Raka Pratama', role: 'kasir', title: 'Kasir 2' },
+  { username: 'owner', name: 'Akbar', role: 'owner', title: 'Owner' },
+  { username: 'kasir1', name: 'Tanada', role: 'kasir', title: 'Kasir 1' },
+  { username: 'kasir2', name: 'Stand', role: 'kasir', title: 'Kasir 2' },
 ];
 
 const currentTime = () => {
@@ -551,6 +551,12 @@ function PageHeading({ eyebrow, title, description, action }) {
 
 function Dashboard({ user, transactions, todayTransactions, revenueToday, onNavigate, onPrint }) {
   const todayPaid = todayTransactions.filter((transaction) => transaction.paymentStatus === 'paid');
+  const pendingCount = todayTransactions.filter((transaction) => transaction.paymentStatus === 'pending_verification').length;
+  const voidCount = todayTransactions.filter((transaction) => transaction.paymentStatus === 'void').length;
+  const cashTransactions = todayPaid.filter((transaction) => transaction.paymentMethod === 'cash');
+  const qrisTransactions = todayPaid.filter((transaction) => transaction.paymentMethod === 'qris_dana');
+  const cashRevenue = cashTransactions.reduce((sum, transaction) => sum + Number(transaction.total), 0);
+  const qrisRevenue = qrisTransactions.reduce((sum, transaction) => sum + Number(transaction.total), 0);
   const newest = [...transactions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
   const popular = new Set(todayPaid.flatMap((transaction) =>
     (transaction.items || [{ cameraName: transaction.cameraName }]).map((item) => item.cameraName),
@@ -559,17 +565,37 @@ function Dashboard({ user, transactions, todayTransactions, revenueToday, onNavi
     .map((item) => item.cameraName).join(', ');
   return (
     <>
-      <PageHeading eyebrow={`SELAMAT PAGI, ${user.name.split(' ')[0].toUpperCase()}`} title="Ruang cerita hari ini." description="Semua yang perlu kamu tahu, dalam satu tempat." action={<button className="button button-primary" onClick={() => onNavigate('create')}><Plus size={17} /> Buat struk baru</button>} />
-      <section className="welcome-card">
-        <div className="welcome-copy"><div className="welcome-label"><span className="welcome-dot" /> HARI INI · {formatDate()}</div><h2>Siap mengabadikan<br />cerita baru?</h2><p>Kelola penyewaan dengan mudah dan pastikan setiap momen punya awal yang manis.</p><button className="button button-light" onClick={() => onNavigate('create')}>Mulai transaksi <ArrowRight size={16} /></button></div>
-        <div className="welcome-decoration"><div className="welcome-ring ring-a" /><div className="welcome-ring ring-b" /><div className="welcome-sparkle"><Sparkles size={20} /></div><div className="welcome-camera"><CameraArtwork large /></div><span className="deco-tag tag-top">little moments</span><span className="deco-tag tag-bottom">stay forever</span></div>
-      </section>
-      <div className="section-heading"><div><h2>Ringkasan hari ini</h2><p>Performa operasional hari ini</p></div><span className="live-pill"><i /> LIVE</span></div>
+      <PageHeading eyebrow={`DASHBOARD · ${formatDate()}`} title={`Halo, ${user.name.split(' ')[0]}.`} description="Ringkasan operasional Evarti hari ini." action={<button className="button button-primary" onClick={() => onNavigate('create')}><Plus size={17} /> Buat transaksi</button>} />
+      <div className="section-heading dashboard-section-heading"><div><h2>Ringkasan hari ini</h2><p>Performa operasional hari ini</p></div><span className="live-pill"><i /> HARI INI</span></div>
       <section className="stats-grid">
-        <StatCard label="Pendapatan" value={formatCurrency(revenueToday)} detail="Dari transaksi lunas hari ini" icon={Wallet} tone="pink" trend={todayPaid.length ? '+ Hari ini' : ''} />
-        <StatCard label="Transaksi" value={todayTransactions.length} detail={`${todayPaid.length} lunas · ${todayTransactions.length - todayPaid.length} menunggu`} icon={ShoppingBag} tone="lavender" />
+        <StatCard label="Pendapatan lunas" value={formatCurrency(revenueToday)} detail="Pemasukan hari ini" icon={Wallet} tone="pink" />
+        <StatCard label="Total transaksi" value={todayTransactions.length} detail={`${todayPaid.length} lunas · ${pendingCount} menunggu`} icon={ShoppingBag} tone="lavender" />
         <StatCard label="Kamera disewa" value={popular} detail="Model berbeda hari ini" icon={Camera} tone="mint" />
-        <StatCard label="Menunggu verifikasi" value={todayTransactions.filter((transaction) => transaction.paymentStatus === 'pending_verification').length} detail="Pembayaran QRIS DANA" icon={Clock3} tone="peach" />
+        <StatCard label="Menunggu verifikasi" value={pendingCount} detail={`${voidCount} transaksi dibatalkan`} icon={Clock3} tone="peach" />
+      </section>
+      <section className="dashboard-middle">
+        <div className="panel payment-summary-panel">
+          <div className="panel-heading"><div><h2>Ringkasan pembayaran</h2><p>Pemasukan berdasarkan metode pembayaran</p></div><CreditCard size={17} className="muted-icon" /></div>
+          <div className="payment-summary-grid">
+            <article className="payment-summary-card">
+              <div className="payment-summary-icon cash-icon"><Banknote size={18} /></div>
+              <div className="payment-summary-copy"><span>Tunai</span><strong>{formatCurrency(cashRevenue)}</strong><small>{cashTransactions.length} transaksi lunas</small></div>
+              <button className="text-button" onClick={() => onNavigate('history')} aria-label="Lihat riwayat pembayaran tunai"><ArrowUpRight size={17} /></button>
+            </article>
+            <article className="payment-summary-card">
+              <div className="payment-summary-icon qris-icon"><CreditCard size={18} /></div>
+              <div className="payment-summary-copy"><span>QRIS DANA</span><strong>{formatCurrency(qrisRevenue)}</strong><small>{qrisTransactions.length} transaksi lunas</small></div>
+              <button className="text-button" onClick={() => onNavigate('history')} aria-label="Lihat riwayat pembayaran QRIS"><ArrowUpRight size={17} /></button>
+            </article>
+          </div>
+        </div>
+        <aside className="panel balance-panel">
+          <div className="balance-panel-heading"><span className="eyebrow">PEMASUKAN HARI INI</span><div className="balance-icon"><Wallet size={17} /></div></div>
+          <strong className="balance-amount">{formatCurrency(revenueToday)}</strong>
+          <div className="balance-divider" />
+          <div className="balance-meta"><span>Transaksi lunas</span><b>{todayPaid.length}</b></div>
+          <div className="balance-meta"><span>Menunggu verifikasi</span><b>{pendingCount}</b></div>
+        </aside>
       </section>
       <section className="dashboard-lower">
         <div className="panel recent-panel">
@@ -618,8 +644,12 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [amountReceived, setAmountReceived] = useState('');
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [activeTransaction, setActiveTransaction] = useState(null);
   const [savedHere, setSavedHere] = useState(false);
+  const submissionLock = useRef(false);
+  const formErrorSummary = useRef(null);
   const selectedItems = selectedCameraIds.flatMap((cameraId) => {
     const camera = cameras.find((entry) => entry.id === cameraId);
     if (!camera) return [];
@@ -657,6 +687,14 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
   const total = rentalSubtotal + addonSubtotal;
   const normalizedWhatsapp = normalizeWhatsapp(whatsapp);
   const change = Math.max(0, Number(amountReceived) - total);
+  const clearErrors = (...names) => {
+    setErrors((previous) => {
+      if (!names.some((name) => previous[name])) return previous;
+      const next = { ...previous };
+      names.forEach((name) => delete next[name]);
+      return next;
+    });
+  };
   const updateCameraSettings = (cameraId, key, value) => {
     setCameraSettings((previous) => ({
       ...previous,
@@ -665,12 +703,13 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
         [key]: value,
       },
     }));
+    clearErrors(`duration-${cameraId}`, `price-${cameraId}`, 'submit');
   };
   const toggleCamera = (cameraId) => {
     setSelectedCameraIds((previous) => previous.includes(cameraId)
       ? previous.filter((id) => id !== cameraId)
       : [...previous, cameraId]);
-    setErrors((previous) => ({ ...previous, camera: '' }));
+    clearErrors('camera', 'submit');
   };
   const toggleAddon = (addon) => {
     setSelectedAddonIds((previous) => {
@@ -744,10 +783,17 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
 
   const submit = async (event) => {
     event.preventDefault();
+    if (submissionLock.current) return;
     if (!validate()) {
       onNotice('Periksa kembali data transaksi yang wajib diisi.');
+      window.requestAnimationFrame(() => {
+        formErrorSummary.current?.focus();
+        formErrorSummary.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
       return;
     }
+    submissionLock.current = true;
+    setSaving(true);
     const firstItem = selectedItems[0];
     const payload = {
       location: activeLocation,
@@ -786,10 +832,15 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
     } catch (error) {
       setErrors((previous) => ({ ...previous, submit: error.message }));
       onNotice(error.message);
+    } finally {
+      submissionLock.current = false;
+      setSaving(false);
     }
   };
 
   const verifyPayment = async () => {
+    if (verifyingPayment) return;
+    setVerifyingPayment(true);
     try {
       const updated = await onVerify(activeTransaction);
       setActiveTransaction(updated);
@@ -797,6 +848,8 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
       onNotice('Pembayaran QRIS terverifikasi. Struk siap dicetak.');
     } catch (error) {
       onNotice(error.message);
+    } finally {
+      setVerifyingPayment(false);
     }
   };
 
@@ -805,19 +858,26 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setGuaranteeError('Format file harus JPG, PNG, atau WebP.');
+      event.target.value = '';
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
       setGuaranteeError('Ukuran foto maksimal 2 MB.');
+      event.target.value = '';
       return;
     }
     const reader = new FileReader();
     setGuaranteePhotoFile(file);
+    event.target.value = '';
     reader.onload = () => {
       setGuaranteeImage(String(reader.result));
       setGuaranteeError('');
+      clearErrors('guaranteeImage', 'submit');
     };
-    reader.onerror = () => setGuaranteeError('Foto tidak dapat dibaca. Silakan pilih file lain.');
+    reader.onerror = () => {
+      setGuaranteePhotoFile(null);
+      setGuaranteeError('Foto tidak dapat dibaca. Silakan pilih file lain.');
+    };
     reader.readAsDataURL(file);
   };
 
@@ -832,6 +892,10 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
       {savedHere && activeTransaction && <div className={`saved-banner ${needsVerification ? 'saved-pending' : ''}`}><div className="saved-banner-icon">{needsVerification ? <Clock3 size={19} /> : <CheckCircle2 size={20} />}</div><div><strong>{needsVerification ? 'Transaksi tersimpan · menunggu verifikasi' : 'Transaksi berhasil disimpan'}</strong><span>{activeTransaction.receiptNo} · {needsVerification ? 'Verifikasi pembayaran untuk membuka cetak struk.' : 'Struk siap dicetak atau bisa dicetak ulang nanti.'}</span></div>{isSavedPaid && <button className="button button-primary button-small" onClick={() => onPrint(activeTransaction)}><Printer size={15} /> Cetak struk</button>}</div>}
       <div className="transaction-layout">
         <form className="transaction-form" onSubmit={submit} noValidate>
+          {Object.keys(errors).length > 0 && <div className="form-error-summary" ref={formErrorSummary} role="alert" tabIndex="-1">
+            <strong>Periksa kembali isian transaksi</strong>
+            <span>{errors.submit || `${Object.keys(errors).length} bagian perlu diperbaiki sebelum transaksi bisa disimpan.`}</span>
+          </div>}
           <section className="form-section">
             <SectionTitle number="01" title="Detail penyewaan" subtitle="Tentukan lokasi dan informasi penyewa" />
             <div className="form-grid">
@@ -839,19 +903,22 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
                 <button type="button" className={`choice-card ${activeLocation === 'cafe' ? 'choice-selected' : ''}`} onClick={() => setLocation('cafe')}><div className="choice-icon choice-icon-pink"><Store size={18} /></div><span><strong>Cafe</strong><small>Penyewaan di cafe</small></span>{activeLocation === 'cafe' && <span className="choice-check"><Check size={12} /></span>}</button>
                 <button type="button" className={`choice-card ${activeLocation === 'event' ? 'choice-selected' : ''}`} onClick={() => setLocation('event')}><div className="choice-icon choice-icon-blue"><Sparkles size={18} /></div><span><strong>Event</strong><small>Penyewaan di event</small></span>{activeLocation === 'event' && <span className="choice-check"><Check size={12} /></span>}</button>
               </div>}</div>
-              <div className="form-field"><label className="field-label" htmlFor="customerName">Nama penyewa <span>*</span></label><input id="customerName" className={`text-input ${errors.customerName ? 'input-invalid' : ''}`} value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Contoh: Alya Putri" />{errors.customerName && fieldError('customerName')}</div>
-              <div className="form-field"><label className="field-label" htmlFor="whatsapp">No. WhatsApp <span>*</span></label><div className={`phone-input ${errors.whatsapp ? 'input-invalid' : ''}`}><input id="whatsapp" value={whatsapp} onChange={(event) => { setWhatsapp(event.target.value); setErrors((previous) => ({ ...previous, whatsapp: '' })); }} placeholder="08xxxxxxxxxx atau +628..." inputMode="tel" /></div>{errors.whatsapp ? fieldError('whatsapp') : <small className="field-hint">Gunakan format 08, 62, atau +62. Nomor dinormalisasi saat disimpan.</small>}</div>
+              <div className="form-field"><label className="field-label" htmlFor="customerName">Nama penyewa <span>*</span></label><input id="customerName" className={`text-input ${errors.customerName ? 'input-invalid' : ''}`} aria-invalid={Boolean(errors.customerName)} value={customerName} onChange={(event) => { setCustomerName(event.target.value); clearErrors('customerName', 'submit'); }} placeholder="Contoh: Alya Putri" />{errors.customerName && fieldError('customerName')}</div>
+              <div className="form-field"><label className="field-label" htmlFor="whatsapp">No. WhatsApp <span>*</span></label><div className={`phone-input ${errors.whatsapp ? 'input-invalid' : ''}`}><input id="whatsapp" aria-invalid={Boolean(errors.whatsapp)} value={whatsapp} onChange={(event) => { setWhatsapp(event.target.value); clearErrors('whatsapp', 'submit'); }} placeholder="08xxxxxxxxxx atau +628..." inputMode="tel" /></div>{errors.whatsapp ? fieldError('whatsapp') : <small className="field-hint">Gunakan format 08, 62, atau +62. Nomor dinormalisasi saat disimpan.</small>}</div>
               <div className="form-field"><label className="field-label" htmlFor="pagerNumber">Nomor pager <span className="optional-tag">OPSIONAL</span></label><input id="pagerNumber" className="text-input" value={pagerNumber} onChange={(event) => setPagerNumber(event.target.value)} placeholder="Nomor pager untuk pengingat waktu sewa" maxLength={40} /></div>
               <div className="form-field full-field"><label className="field-label">Jaminan <span className="optional-tag">OPSIONAL</span></label><div className="guarantee-options">
-                {[['none', 'Tidak ada'], ['photo', 'Foto'], ['id_number', 'Nomor ID']].map(([value, label]) => <button key={value} type="button" onClick={() => { setGuaranteeType(value); setGuaranteeError(''); }} className={`pill-option ${guaranteeType === value ? 'pill-option-active' : ''}`}>{guaranteeType === value && <Check size={13} />}{label}</button>)}
+                {[['none', 'Tidak ada'], ['photo', 'Foto'], ['id_number', 'Nomor ID']].map(([value, label]) => <button key={value} type="button" aria-pressed={guaranteeType === value} onClick={() => { setGuaranteeType(value); setGuaranteeError(''); clearErrors('guaranteeId', 'guaranteeImage', 'submit'); }} className={`pill-option ${guaranteeType === value ? 'pill-option-active' : ''}`}>{guaranteeType === value && <Check size={13} />}{label}</button>)}
               </div></div>
               {guaranteeType === 'photo' && <div className="form-field full-field"><label className="field-label">Foto jaminan <span>*</span></label><label className={`upload-box ${guaranteeImage ? 'upload-has-file' : ''}`}><input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={onGuaranteeUpload} />{guaranteeImage ? <><img src={guaranteeImage} alt="Pratinjau jaminan" /><span><strong>Foto berhasil ditambahkan</strong><small>Ketuk untuk mengganti foto</small></span></> : <><ImagePlus size={22} /><span><strong>Unggah atau ambil foto</strong><small>JPG, PNG, WebP · maks. 2 MB</small></span></>}</label>{(guaranteeError || errors.guaranteeImage) && fieldError('guaranteeImage', guaranteeError || errors.guaranteeImage)}</div>}
-              {guaranteeType === 'id_number' && <div className="form-field full-field"><label className="field-label" htmlFor="guaranteeId">Nomor ID <span>*</span></label><input id="guaranteeId" className={`text-input ${errors.guaranteeId ? 'input-invalid' : ''}`} value={guaranteeId} onChange={(event) => setGuaranteeId(event.target.value)} placeholder="Masukkan nomor ID" />{errors.guaranteeId && fieldError('guaranteeId')}</div>}
+              {guaranteeType === 'id_number' && <div className="form-field full-field"><label className="field-label" htmlFor="guaranteeId">Nomor ID <span>*</span></label><input id="guaranteeId" className={`text-input ${errors.guaranteeId ? 'input-invalid' : ''}`} aria-invalid={Boolean(errors.guaranteeId)} value={guaranteeId} onChange={(event) => { setGuaranteeId(event.target.value); clearErrors('guaranteeId', 'submit'); }} placeholder="Masukkan nomor ID" />{errors.guaranteeId && fieldError('guaranteeId')}</div>}
             </div>
             <div className="privacy-note"><ShieldCheck size={15} /><span>Data jaminan hanya dapat dilihat oleh Owner dan kasir yang membuat transaksi. Tidak dicetak di struk.</span></div>
           </section>
           <section className="form-section">
             <SectionTitle number="02" title="Pilih kamera" subtitle="Pilih satu atau lebih kamera yang akan disewa" />
+            <div className="selection-summary" aria-live="polite">
+              <strong>{selectedCameraIds.length}</strong> kamera dipilih
+            </div>
             {errors.camera && fieldError('camera')}
             {cameras.length === 0 ? <EmptyState title="Katalog belum tersedia" body="Belum ada kamera aktif di katalog." /> : <div className="camera-grid">
               {cameras.map((camera) => <button type="button" aria-pressed={selectedCameraIds.includes(camera.id)} className={`camera-option ${selectedCameraIds.includes(camera.id) ? 'camera-option-selected' : ''}`} key={camera.id} onClick={() => toggleCamera(camera.id)}><div className="camera-option-visual"><CameraArtwork tone={camera.tone} image={camera.image} /><span className="camera-select-check"><Check size={13} /></span></div><div className="camera-option-info"><strong>{camera.name}</strong><span>{formatCurrency(camera.prices[1])} <small>/ jam</small></span></div></button>)}
@@ -898,18 +965,18 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
             </div>}
             {selectedItems.length > 1 && selectedAddons.length === 0 && <div className="rental-total"><span>Total semua kamera</span><strong>{formatCurrency(rentalSubtotal)}</strong></div>}
             <div className="form-grid time-grid">
-              <div className="form-field"><label className="field-label" htmlFor="startTime">Jam mulai <span>*</span></label><input id="startTime" className="text-input time-input" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></div>
+              <div className="form-field"><label className="field-label" htmlFor="startTime">Jam mulai <span>*</span></label><input id="startTime" className="text-input time-input" type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); clearErrors('time', 'submit'); }} /></div>
               <div className="form-field"><label className="field-label">Jam selesai <span className="auto-tag">OTOMATIS</span></label><div className="readonly-input"><Clock3 size={16} /><strong>{endTime || '--:--'}</strong><span>{durationMinutes > 0 ? `Durasi ${Math.floor(durationMinutes / 60)}j ${durationMinutes % 60 ? `${durationMinutes % 60}m` : ''}` : 'Isi durasi'}</span></div></div>
             </div>
             {errors.time && fieldError('time')}
             <div className="form-field payment-field"><label className="field-label">Metode pembayaran <span>*</span></label><div className="payment-methods">
-              <button type="button" onClick={() => setPaymentMethod('cash')} className={`payment-option ${paymentMethod === 'cash' ? 'payment-selected' : ''}`}><div className="payment-icon cash-icon"><Banknote size={19} /></div><span><strong>Tunai</strong><small>Bayar langsung</small></span>{paymentMethod === 'cash' && <CheckCircle2 size={17} className="payment-check" />}</button>
-              <button type="button" onClick={() => setPaymentMethod('qris_dana')} className={`payment-option ${paymentMethod === 'qris_dana' ? 'payment-selected' : ''}`}><div className="payment-icon qris-icon"><CreditCard size={18} /></div><span><strong>QRIS DANA</strong><small>Transfer non-tunai</small></span>{paymentMethod === 'qris_dana' && <CheckCircle2 size={17} className="payment-check" />}</button>
+              <button type="button" aria-pressed={paymentMethod === 'cash'} onClick={() => { setPaymentMethod('cash'); clearErrors('amountReceived', 'submit'); }} className={`payment-option ${paymentMethod === 'cash' ? 'payment-selected' : ''}`}><div className="payment-icon cash-icon"><Banknote size={19} /></div><span><strong>Tunai</strong><small>Bayar langsung</small></span>{paymentMethod === 'cash' && <CheckCircle2 size={17} className="payment-check" />}</button>
+              <button type="button" aria-pressed={paymentMethod === 'qris_dana'} onClick={() => { setPaymentMethod('qris_dana'); clearErrors('amountReceived', 'submit'); }} className={`payment-option ${paymentMethod === 'qris_dana' ? 'payment-selected' : ''}`}><div className="payment-icon qris-icon"><CreditCard size={18} /></div><span><strong>QRIS DANA</strong><small>Transfer non-tunai</small></span>{paymentMethod === 'qris_dana' && <CheckCircle2 size={17} className="payment-check" />}</button>
             </div></div>
-            {paymentMethod === 'cash' ? <div className="form-grid cash-grid"><div className="form-field"><label className="field-label" htmlFor="amountReceived">Uang diterima <span>*</span></label><div className={`currency-input ${errors.amountReceived ? 'input-invalid' : ''}`}><span>Rp</span><input id="amountReceived" className="text-input" type="number" min={total} value={amountReceived} onChange={(event) => setAmountReceived(event.target.value)} placeholder="0" /></div>{errors.amountReceived && fieldError('amountReceived')}</div><div className="change-card"><span>Kembali</span><strong>{formatCurrency(change)}</strong>{Number(amountReceived) > 0 && Number(amountReceived) < total && <small>Uang diterima kurang dari total.</small>}</div></div> : <div className="qris-panel"><div className="qris-symbol">D</div><div className="qris-copy"><strong>QRIS DANA Evarti</strong><span>Tampilkan QRIS statis resmi Evarti kepada penyewa, lalu verifikasi pembayaran secara manual.</span></div><div className="qris-total"><small>Total pembayaran</small><strong>{formatCurrency(total)}</strong></div></div>}
+            {paymentMethod === 'cash' ? <div className="form-grid cash-grid"><div className="form-field"><label className="field-label" htmlFor="amountReceived">Uang diterima <span>*</span></label><div className={`currency-input ${errors.amountReceived ? 'input-invalid' : ''}`}><span>Rp</span><input id="amountReceived" className="text-input" type="number" min={total} value={amountReceived} onChange={(event) => { setAmountReceived(event.target.value); clearErrors('amountReceived', 'submit'); }} placeholder="0" /></div>{errors.amountReceived && fieldError('amountReceived')}</div><div className="change-card"><span>Kembali</span><strong>{formatCurrency(change)}</strong>{Number(amountReceived) > 0 && Number(amountReceived) < total && <small>Uang diterima kurang dari total.</small>}</div></div> : <div className="qris-panel"><div className="qris-symbol">D</div><div className="qris-copy"><strong>QRIS DANA Evarti</strong><span>Tampilkan QRIS statis resmi Evarti kepada penyewa, lalu verifikasi pembayaran secara manual.</span></div><div className="qris-total"><small>Total pembayaran</small><strong>{formatCurrency(total)}</strong></div></div>}
             {paymentMethod === 'qris_dana' && <div className="manual-verification-note"><ShieldCheck size={15} /> Pembayaran diverifikasi kasir secara manual setelah dana diterima.</div>}
           </section>
-          <div className="form-submit-row"><span><ShieldCheck size={15} /> Pastikan semua data sudah benar.</span><button className="button button-primary button-submit" type="submit"><CheckCircle2 size={17} /> Simpan transaksi</button></div>
+          <div className="form-submit-row"><span><ShieldCheck size={15} /> Pastikan semua data sudah benar.</span><button className="button button-primary button-submit" type="submit" disabled={saving} aria-busy={saving}>{saving ? <><span className="button-spinner" /> Menyimpan transaksi...</> : <><CheckCircle2 size={17} /> Simpan transaksi</>}</button></div>
         </form>
         <aside className="preview-column">
           <div className="preview-sticky">
@@ -917,7 +984,7 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
             <div className="receipt-location-tag">{activeLocation === 'cafe' ? 'CAF' : 'EVT'} <span>•</span> {activeLocation === 'cafe' ? 'Cafe' : 'Event'}</div>
             <Receipt transaction={preview} />
             <div className="preview-footer"><span><Printer size={14} /> Thermal receipt · 58 mm</span><span>Tinjau detail sebelum cetak</span></div>
-            {needsVerification && <button className="button button-primary button-full verify-button" onClick={verifyPayment}><BadgeCheck size={17} /> Pembayaran Terverifikasi</button>}
+            {needsVerification && <button className="button button-primary button-full verify-button" onClick={verifyPayment} disabled={verifyingPayment} aria-busy={verifyingPayment}>{verifyingPayment ? <><span className="button-spinner" /> Memverifikasi...</> : <><BadgeCheck size={17} /> Pembayaran Terverifikasi</>}</button>}
             {isSavedPaid && <button className="button button-primary button-full verify-button" onClick={() => onPrint(activeTransaction)}><Printer size={17} /> Cetak struk</button>}
             {savedTransaction && !savedHere && <button className="button button-secondary button-full verify-button" onClick={() => onPrint(savedTransaction)}><Printer size={17} /> Cetak struk terakhir</button>}
             <div className="preview-security"><ShieldCheck size={14} /> Nomor WhatsApp tampil pada struk. Data jaminan tetap privat.</div>
