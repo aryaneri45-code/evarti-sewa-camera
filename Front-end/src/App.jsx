@@ -31,9 +31,10 @@ const addonCategoryLabels = {
   print: 'Print foto',
   transfer: 'Pemindahan file',
 };
-const jakartaToday = () => new Intl.DateTimeFormat('en-CA', {
+const jakartaDateFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Jakarta',
-}).format(new Date());
+});
+const formatJakartaDate = (date = new Date()) => jakartaDateFormatter.format(date);
 const calcEndTime = (start, minutes) => {
   if (!start || !minutes) return '';
   const [hours, mins] = start.split(':').map(Number);
@@ -222,7 +223,7 @@ function App() {
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
-  const [reportDate, setReportDate] = useState(jakartaToday);
+  const [reportDate, setReportDate] = useState(formatJakartaDate);
   const [reportPeriod, setReportPeriod] = useState('weekly');
   const [reportCashier, setReportCashier] = useState('all');
   const [reportLocation, setReportLocation] = useState('all');
@@ -316,7 +317,10 @@ function App() {
   const visibleTransactions = transactions.filter((transaction) => (
     isOwner || transaction.cashierId === user?.username
   ));
-  const todayTransactions = visibleTransactions.filter((transaction) => transaction.createdAt.slice(0, 10) === new Date().toISOString().slice(0, 10));
+  const todayDate = formatJakartaDate();
+  const todayTransactions = visibleTransactions.filter((transaction) => (
+    formatJakartaDate(new Date(transaction.createdAt)) === todayDate
+  ));
   const paidToday = todayTransactions.filter((transaction) => transaction.paymentStatus === 'paid');
   const revenueToday = paidToday.reduce((sum, transaction) => sum + Number(transaction.total), 0);
 

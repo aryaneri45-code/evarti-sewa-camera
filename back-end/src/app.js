@@ -47,7 +47,7 @@ export function createApp(config = {}) {
     },
     credentials: true,
     allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
-    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   }));
   app.use(express.json({ limit: '100kb', type: ['application/json', 'application/*+json'] }));
   app.use((request, response, next) => {

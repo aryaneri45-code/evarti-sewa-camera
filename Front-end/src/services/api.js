@@ -4,6 +4,14 @@ const imageCredentials = apiRoot && new URL(apiRoot, window.location.origin).ori
   ? 'use-credentials'
   : undefined;
 
+function buildQueryString(params) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== '' && value !== 'all' && value != null) query.set(key, value);
+  }
+  return query.size ? `?${query.toString()}` : '';
+}
+
 async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes((options.method || 'GET').toUpperCase())) {
@@ -99,12 +107,7 @@ export const api = {
     return request(`/api/cameras/${encodeURIComponent(id)}/image`, { method: 'POST', body });
   },
   async transactions(params = {}) {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== '' && value !== 'all' && value != null) query.set(key, value);
-    }
-    const suffix = query.size ? `?${query.toString()}` : '';
-    return request(`/api/transactions${suffix}`);
+    return request(`/api/transactions${buildQueryString(params)}`);
   },
   async createTransaction(transaction, guaranteePhoto) {
     if (guaranteePhoto) {
@@ -131,20 +134,10 @@ export const api = {
     });
   },
   async reportSummary(params = {}) {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== '' && value !== 'all' && value != null) query.set(key, value);
-    }
-    const suffix = query.size ? `?${query.toString()}` : '';
-    return request(`/api/reports/summary${suffix}`);
+    return request(`/api/reports/summary${buildQueryString(params)}`);
   },
   async reportPdf(params = {}) {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== '' && value !== 'all' && value != null) query.set(key, value);
-    }
-    const suffix = query.size ? `?${query.toString()}` : '';
-    return request(`/api/reports/summary/pdf${suffix}`);
+    return request(`/api/reports/summary/pdf${buildQueryString(params)}`);
   },
 };
 

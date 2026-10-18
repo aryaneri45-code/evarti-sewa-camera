@@ -96,6 +96,15 @@ test('login issues HTTP-only sessions and invalid credentials are rejected', asy
   assert.equal(me.status, 200);
   assert.equal(me.body.user.username, 'owner');
   assert.equal((await request(app).get('/api/cameras')).status, 401);
+  const preflightResponse = await request(app)
+    .options('/api/cameras/casio')
+    .set('Origin', 'http://localhost:5173')
+    .set('Access-Control-Request-Method', 'DELETE')
+    .set('Access-Control-Request-Headers', 'x-csrf-token');
+
+  assert.equal(preflightResponse.status, 204);
+  assert.match(preflightResponse.headers['access-control-allow-methods'], /\bDELETE\b/);
+  assert.equal(preflightResponse.headers['access-control-allow-origin'], 'http://localhost:5173');
 });
 
 test('cashier location is enforced by role and cashier data is isolated', async () => {
