@@ -6,7 +6,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { validateEnv } from '../src/config/env.js';
-import { closeDatabase } from '../src/db.js';
+import { closeDatabase, seedDatabase } from '../src/db.js';
 import { jakartaDate } from '../src/utils/transactions.js';
 
 const passwords = {
@@ -95,6 +95,7 @@ test('login issues HTTP-only sessions and invalid credentials are rejected', asy
   const me = await agent.get('/api/auth/me');
   assert.equal(me.status, 200);
   assert.equal(me.body.user.username, 'owner');
+  assert.equal(me.body.user.name, 'Akbar');
   assert.equal((await request(app).get('/api/cameras')).status, 401);
   const preflightResponse = await request(app)
     .options('/api/cameras/casio')
@@ -105,6 +106,23 @@ test('login issues HTTP-only sessions and invalid credentials are rejected', asy
   assert.equal(preflightResponse.status, 204);
   assert.match(preflightResponse.headers['access-control-allow-methods'], /\bDELETE\b/);
   assert.equal(preflightResponse.headers['access-control-allow-origin'], 'http://localhost:5173');
+});
+
+test('existing account names are synchronized with the login profiles', () => {
+  const app = makeApp();
+  const db = app.locals.db;
+  db.prepare("UPDATE users SET name = 'Old name'").run();
+
+  seedDatabase(db);
+
+  assert.deepEqual(
+    db.prepare('SELECT username, name FROM users ORDER BY username').all(),
+    [
+      { username: 'kasir1', name: 'Tanada' },
+      { username: 'kasir2', name: 'Stand' },
+      { username: 'owner', name: 'Akbar' },
+    ],
+  );
 });
 
 test('cashier location is enforced by role and cashier data is isolated', async () => {
@@ -334,7 +352,7 @@ test('QRIS can only print after verification and verifies with audit trail', asy
     .send({});
   assert.equal(verified.status, 200);
   assert.equal(verified.body.transaction.paymentStatus, 'paid');
-  assert.equal(verified.body.transaction.verifiedBy, 'Nadia Safitri');
+  assert.equal(verified.body.transaction.verifiedBy, 'Tanada');
 
   const printed = await cashier.agent.post(`/api/transactions/${created.body.transaction.id}/print`)
     .set('X-CSRF-Token', cashier.csrfToken);

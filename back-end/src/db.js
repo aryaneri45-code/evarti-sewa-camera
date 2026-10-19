@@ -172,9 +172,9 @@ export function seedDatabase(db, passwords = {}) {
   const count = db.prepare('SELECT COUNT(*) AS count FROM users').get().count;
   if (count === 0) {
     const accounts = [
-      { id: 'owner', username: 'owner', name: 'Ariani Putri', role: 'owner', password: passwords.owner },
-      { id: 'kasir1', username: 'kasir1', name: 'Nadia Safitri', role: 'kasir', password: passwords.cashier1 },
-      { id: 'kasir2', username: 'kasir2', name: 'Raka Pratama', role: 'kasir', password: passwords.cashier2 },
+      { id: 'owner', username: 'owner', name: 'Akbar', role: 'owner', password: passwords.owner },
+      { id: 'kasir1', username: 'kasir1', name: 'Tanada', role: 'kasir', password: passwords.cashier1 },
+      { id: 'kasir2', username: 'kasir2', name: 'Stand', role: 'kasir', password: passwords.cashier2 },
     ];
     if (accounts.some((account) => !account.password || account.password.length < 12)) {
       throw new Error('Password bootstrap Owner, Kasir 1, dan Kasir 2 harus diatur (minimal 12 karakter).');
@@ -189,6 +189,10 @@ export function seedDatabase(db, passwords = {}) {
     });
     seedUsers();
   }
+  const updateUserName = db.prepare('UPDATE users SET name = ? WHERE username = ?');
+  updateUserName.run('Akbar', 'owner');
+  updateUserName.run('Tanada', 'kasir1');
+  updateUserName.run('Stand', 'kasir2');
   const insertCamera = db.prepare(
     'INSERT OR IGNORE INTO cameras (id, name, price_1h, price_2h, active) VALUES (?, ?, ?, ?, 1)',
   );
