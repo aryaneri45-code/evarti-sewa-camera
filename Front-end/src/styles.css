@@ -483,6 +483,8 @@ td small { display: block; margin-top: 5px; color: #a69a9f; font-size: 11px; }
 .print-choice-close { position: absolute; top: 14px; right: 14px; display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 7px; background: #faf5f6; color: #8d7d83; cursor: pointer; }
 .print-choice-options { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 22px; }
 .print-choice-options .button { justify-content: center; padding: 0 8px; }
+.post-save-dialog .post-save-actions { display: grid; gap: 9px; margin-top: 22px; }
+.post-save-error { margin-top: 14px; padding: 9px 10px; border: 1px solid #f0d5d9; border-radius: 7px; background: #fff7f8; color: #a34d5d; font-size: 12px; }
 
 .login-page { display: grid; min-height: 100vh; grid-template-columns: 1.02fr .98fr; background: #fff; }
 .login-visual { position: relative; display: flex; min-height: 100vh; flex-direction: column; overflow: hidden; padding: 35px 45px 24px; background: linear-gradient(145deg, #853e5c, #913f5e 58%, #a34d6b); color: white; }

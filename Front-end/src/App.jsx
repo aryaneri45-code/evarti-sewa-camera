@@ -648,6 +648,8 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [activeTransaction, setActiveTransaction] = useState(null);
   const [savedHere, setSavedHere] = useState(false);
+  const [showPostSaveDialog, setShowPostSaveDialog] = useState(false);
+  const [postSaveError, setPostSaveError] = useState('');
   const submissionLock = useRef(false);
   const formErrorSummary = useRef(null);
   const selectedItems = selectedCameraIds.flatMap((cameraId) => {
@@ -754,6 +756,8 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
   useEffect(() => {
     setSavedHere(false);
     setActiveTransaction(null);
+    setShowPostSaveDialog(false);
+    setPostSaveError('');
   }, [activeLocation, customerName, whatsapp, pagerNumber, guaranteeType, guaranteeId, guaranteeImage, guaranteePhotoFile, selectedCameraIds, selectedAddonIds, cameraSettings, startTime, paymentMethod, amountReceived]);
 
   const fieldError = (name, message) => <div className="field-error">{message || errors[name]}</div>;
@@ -829,6 +833,8 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
       });
       setActiveTransaction(transaction);
       setSavedHere(true);
+      setPostSaveError('');
+      setShowPostSaveDialog(true);
     } catch (error) {
       setErrors((previous) => ({ ...previous, submit: error.message }));
       onNotice(error.message);
@@ -841,12 +847,14 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
   const verifyPayment = async () => {
     if (verifyingPayment) return;
     setVerifyingPayment(true);
+    setPostSaveError('');
     try {
       const updated = await onVerify(activeTransaction);
       setActiveTransaction(updated);
       setSavedHere(true);
       onNotice('Pembayaran QRIS terverifikasi. Struk siap dicetak.');
     } catch (error) {
+      setPostSaveError(error.message);
       onNotice(error.message);
     } finally {
       setVerifyingPayment(false);
@@ -890,6 +898,19 @@ function CreateTransaction({ user, cameras, addons, onSave, onVerify, onNotice, 
     <>
       <PageHeading eyebrow="TRANSAKSI BARU" title="Buat struk sewa." description="Lengkapi detail penyewaan, lalu cek pratinjau sebelum disimpan." action={<div className="secure-note"><ShieldCheck size={15} /> Data tersimpan aman</div>} />
       {savedHere && activeTransaction && <div className={`saved-banner ${needsVerification ? 'saved-pending' : ''}`}><div className="saved-banner-icon">{needsVerification ? <Clock3 size={19} /> : <CheckCircle2 size={20} />}</div><div><strong>{needsVerification ? 'Transaksi tersimpan · menunggu verifikasi' : 'Transaksi berhasil disimpan'}</strong><span>{activeTransaction.receiptNo} · {needsVerification ? 'Verifikasi pembayaran untuk membuka cetak struk.' : 'Struk siap dicetak atau bisa dicetak ulang nanti.'}</span></div>{isSavedPaid && <button className="button button-primary button-small" onClick={() => onPrint(activeTransaction)}><Printer size={15} /> Cetak struk</button>}</div>}
+      {showPostSaveDialog && activeTransaction && <div className="print-choice-backdrop" role="presentation">
+        <section className="print-choice-dialog post-save-dialog" role="dialog" aria-modal="true" aria-labelledby="post-save-title">
+          <button className="print-choice-close" type="button" onClick={() => setShowPostSaveDialog(false)} aria-label="Tutup dialog transaksi"><X size={18} /></button>
+          <div className="print-help-icon">{needsVerification ? <CreditCard size={21} /> : <CheckCircle2 size={21} />}</div>
+          <span className="eyebrow">{needsVerification ? 'PEMBAYARAN QRIS' : 'TRANSAKSI TUNAI'}</span>
+          <h2 id="post-save-title">{needsVerification ? 'Verifikasi pembayaran' : 'Transaksi berhasil disimpan'}</h2>
+          <p>{activeTransaction.receiptNo} · {needsVerification ? `Pastikan pembayaran ${formatCurrency(activeTransaction.total)} telah diterima.` : 'Transaksi tunai sudah tercatat dan struk siap dicetak.'}</p>
+          {postSaveError && <div className="post-save-error" role="alert">{postSaveError}</div>}
+          <div className="post-save-actions">
+            {needsVerification ? <button className="button button-primary button-full" type="button" onClick={verifyPayment} disabled={verifyingPayment} aria-busy={verifyingPayment}>{verifyingPayment ? <><span className="button-spinner" /> Memverifikasi...</> : <><BadgeCheck size={17} /> Verifikasi pembayaran</>}</button> : isSavedPaid && <button className="button button-primary button-full" type="button" onClick={() => { setShowPostSaveDialog(false); onPrint(activeTransaction); }}><Printer size={17} /> Cetak struk</button>}
+          </div>
+        </section>
+      </div>}
       <div className="transaction-layout">
         <form className="transaction-form" onSubmit={submit} noValidate>
           {Object.keys(errors).length > 0 && <div className="form-error-summary" ref={formErrorSummary} role="alert" tabIndex="-1">
