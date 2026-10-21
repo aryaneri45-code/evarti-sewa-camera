@@ -65,16 +65,44 @@ Sistem memiliki **3 akun tetap**:
 
 ```json
 [
-  {"id": "casio", "name": "Casio", "prices": {"1": 12000, "2": 15000}},
-  {"id": "olympus-tough-8010", "name": "Olympus Tough - 8010", "prices": {"1": 15000, "2": 20000}},
-  {"id": "sony-cybershot-810", "name": "Sony Cybershot 810", "prices": {"1": 20000, "2": 30000}},
-  {"id": "canon-ixus-185", "name": "Canon Ixus 185", "prices": {"1": 25000, "2": 35000}},
-  {"id": "lumix-fx520", "name": "Lumix FX520", "prices": {"1": 30000, "2": 40000}},
-  {"id": "canon-ixus-285", "name": "Canon Ixus 285", "prices": {"1": 35000, "2": 50000}}
+  {"id": "canon-ixus-160", "name": "Canon Ixus 160", "prices": {"1": 15000, "2": 23000}},
+  {"id": "canon-ixus-185", "name": "Canon Ixus 185", "prices": {"1": 18000, "2": 27000}},
+  {"id": "canon-ixus-285", "name": "Canon Ixus 285", "prices": {"1": 30000, "2": 45000}},
+  {"id": "canon-SX610-HS", "name": "Canon SX610 HS", "prices": {"1": 40000, "2": 60000}},
+  {"id": "sony-dsc-w810", "name": "Sony DSC W810", "prices": {"1": 20000, "2": 30000}},
+  {"id": "sony-dsc-wx7", "name": "Sony DSC WX7", "prices": {"1": 25000, "2": 38000}},
+  {"id": "sony-dsc-s950", "name": "Sony DSC S950", "prices": {"1": 18000, "2": 27000}},
+  {"id": "nikon-coolpix-s3500", "name": "Nikon Coolpix S3500", "prices": {"1": 18000, "2": 27000}},
+  {"id": "nikon-coolpix-a100", "name": "Nikon Coolpix A100", "prices": {"1": 15000, "2": 23000}},
+  {"id": "fujifilm-finepix-jv", "name": "Fujifilm FinePix JV", "prices": {"1": 10000, "2": 15000}},
+  {"id": "casio-qv-r200", "name": "Casio QV-R200", "prices": {"1": 10000, "2": 15000}},
+  {"id": "lumix-dmc-fx520", "name": "Lumix DMC-FX520", "prices": {"1": 15000, "2": 23000}},
+  {"id": "lumix-dmc-lx7", "name": "Lumix DMC-LX7", "prices": {"1": 30000, "2": 45000}},
+  {"id": "olympus-mtough-8010", "name": "Olympus MTough - 8010", "prices": {"1": 15000, "2": 20000}}
 ]
 ```
 
 Setiap item katalog ditambah field `image` (URL/path foto kamera).
+
+**Data add-on awal:**
+
+```json
+[
+  {"id": "print-1", "category": "print", "label": "1 foto", "price": 10000},
+  {"id": "print-2", "category": "print", "label": "2 foto", "price": 15000},
+  {"id": "print-3", "category": "print", "label": "3 foto", "price": 20000},
+  {"id": "print-4", "category": "print", "label": "4 foto", "price": 20000},
+  {"id": "print-5", "category": "print", "label": "5 foto", "price": 25000},
+  {"id": "Analog A", "category": "property", "label": "Analog A", "price": 10000},
+  {"id": "Analog B", "category": "property", "label": "Analog B", "price": 5000},
+  {"id": "Analog C", "category": "property", "label": "Analog C", "price": 7000},
+  {"id": "Airdrop/Local Send", "category": "transfer", "label": "100 Foto", "price": 5000},
+  {"id": "Google Drive - 1 week", "category": "transfer", "label": "100 Foto", "price": 10000},
+  {"id": "fotografer-5", "category": "photographer", "label": "5 foto", "price": 10000},
+  {"id": "fotografer-10", "category": "photographer", "label": "10 foto", "price": 18000},
+  {"id": "fotografer-15", "category": "photographer", "label": "15 foto", "price": 25000}
+]
+```
 
 ### 4.3 Formulir Pembuatan Struk
 Field input:

@@ -43,16 +43,16 @@ function rentalPayload(overrides = {}) {
     customerName: 'Alya Putri',
     customerWhatsapp: '+6281234567890',
     guaranteeType: 'none',
-    cameraId: 'casio',
+    cameraId: 'canon-ixus-160',
     durationLabel: '1 Jam',
     durationMinutes: 60,
     startTime: '10:00',
     endTime: '11:00',
-    price: 12000,
+    price: 15000,
     isManualPrice: false,
-    total: 12000,
+    total: 15000,
     paymentMethod: 'cash',
-    amountReceived: 15000,
+    amountReceived: 20000,
     ...overrides,
   };
 }
@@ -98,7 +98,7 @@ test('login issues HTTP-only sessions and invalid credentials are rejected', asy
   assert.equal(me.body.user.name, 'Akbar');
   assert.equal((await request(app).get('/api/cameras')).status, 401);
   const preflightResponse = await request(app)
-    .options('/api/cameras/casio')
+    .options('/api/cameras/canon-ixus-160')
     .set('Origin', 'http://localhost:5173')
     .set('Access-Control-Request-Method', 'DELETE')
     .set('Access-Control-Request-Headers', 'x-csrf-token');
@@ -144,7 +144,7 @@ test('cashier location is enforced by role and cashier data is isolated', async 
 
   const eventCreated = await cashierTwo.agent.post('/api/transactions')
     .set('X-CSRF-Token', cashierTwo.csrfToken)
-    .send(rentalPayload({ location: 'cafe', customerName: 'Rani', cameraId: 'casio' }));
+    .send(rentalPayload({ location: 'cafe', customerName: 'Rani', cameraId: 'canon-ixus-160' }));
   assert.equal(eventCreated.status, 201);
   assert.equal(eventCreated.body.transaction.location, 'event');
   assert.match(eventCreated.body.transaction.receiptNo, /^EVT-\d{8}-001$/);
@@ -157,7 +157,7 @@ test('cashier location is enforced by role and cashier data is isolated', async 
   assert.equal(cashierOneList.body.transactions[0].customerPagerNumber, 'P-07');
   assert.equal(cashierTwoList.body.transactions[0].customerName, 'Rani');
   assert.equal((await cashierTwo.agent.get(`/api/transactions/${created.body.transaction.id}`)).status, 404);
-  assert.equal((await cashierOne.agent.get('/api/cameras')).body.cameras.length, 6);
+  assert.equal((await cashierOne.agent.get('/api/cameras')).body.cameras.length, 14);
 });
 
 test('one transaction can include multiple cameras with independent durations and summed prices', async () => {
@@ -167,27 +167,27 @@ test('one transaction can include multiple cameras with independent durations an
     .set('X-CSRF-Token', cashier.csrfToken)
     .send(rentalPayload({
       items: [
-        { cameraId: 'casio', durationMinutes: 120, price: 15000, isManualPrice: false },
-        { cameraId: 'olympus-tough-8010', durationMinutes: 60, price: 15000, isManualPrice: false },
+        { cameraId: 'canon-ixus-160', durationMinutes: 120, price: 23000, isManualPrice: false },
+        { cameraId: 'olympus-mtough-8010', durationMinutes: 60, price: 15000, isManualPrice: false },
       ],
       durationMinutes: 120,
       durationLabel: '2 Jam',
       endTime: '12:00',
-      price: 30000,
-      total: 30000,
+      price: 38000,
+      total: 38000,
       amountReceived: 50000,
     }));
 
   assert.equal(created.status, 201);
-  assert.equal(created.body.transaction.total, 30000);
+  assert.equal(created.body.transaction.total, 38000);
   assert.equal(created.body.transaction.endTime, '12:00');
   assert.deepEqual(created.body.transaction.items.map(({ cameraId, durationLabel, price }) => ({
     cameraId,
     durationLabel,
     price,
   })), [
-    { cameraId: 'casio', durationLabel: '2 Jam', price: 15000 },
-    { cameraId: 'olympus-tough-8010', durationLabel: '1 Jam', price: 15000 },
+    { cameraId: 'canon-ixus-160', durationLabel: '2 Jam', price: 23000 },
+    { cameraId: 'olympus-mtough-8010', durationLabel: '1 Jam', price: 15000 },
   ]);
 
   const history = await cashier.agent.get('/api/transactions');
@@ -198,8 +198,8 @@ test('one transaction can include multiple cameras with independent durations an
     rentalCount,
     revenue,
   })).sort((a, b) => a.cameraId.localeCompare(b.cameraId)), [
-    { cameraId: 'casio', rentalCount: 1, revenue: 15000 },
-    { cameraId: 'olympus-tough-8010', rentalCount: 1, revenue: 15000 },
+    { cameraId: 'canon-ixus-160', rentalCount: 1, revenue: 23000 },
+    { cameraId: 'olympus-mtough-8010', rentalCount: 1, revenue: 15000 },
   ]);
 });
 
@@ -209,30 +209,30 @@ test('addon selections are priced from the catalog and remain unchanged in trans
   const owner = await login(app, 'owner');
   const availableAddons = await cashier.agent.get('/api/addons');
   assert.equal(availableAddons.status, 200);
-  assert.equal(availableAddons.body.addons.length, 12);
+  assert.equal(availableAddons.body.addons.length, 13);
 
-  const selectedAddonIds = ['analog-camera', 'photographer-10', 'print-5', 'file-airdrop'];
+  const selectedAddonIds = ['Analog A', 'fotografer-10', 'print-5', 'Airdrop/Local Send'];
   const created = await cashier.agent.post('/api/transactions')
     .set('X-CSRF-Token', cashier.csrfToken)
     .send(rentalPayload({
       addonIds: selectedAddonIds,
-      total: 47000,
-      amountReceived: 50000,
+      total: 73000,
+      amountReceived: 75000,
     }));
   assert.equal(created.status, 201);
-  assert.equal(created.body.transaction.price, 12000);
-  assert.equal(created.body.transaction.total, 47000);
-  assert.equal(created.body.transaction.change, 3000);
+  assert.equal(created.body.transaction.price, 15000);
+  assert.equal(created.body.transaction.total, 73000);
+  assert.equal(created.body.transaction.change, 2000);
   assert.deepEqual(created.body.transaction.addons.map(({ id, price }) => ({ id, price })), [
-    { id: 'analog-camera', price: 10000 },
-    { id: 'photographer-10', price: 15000 },
-    { id: 'print-5', price: 10000 },
-    { id: 'file-airdrop', price: 0 },
+    { id: 'Analog A', price: 10000 },
+    { id: 'fotografer-10', price: 18000 },
+    { id: 'print-5', price: 25000 },
+    { id: 'Airdrop/Local Send', price: 5000 },
   ]);
 
   const catalog = (await owner.agent.get('/api/addons')).body.addons;
-  const updatedCatalog = catalog.map((addon) => addon.id === 'analog-camera'
-    ? { ...addon, label: 'Camera analog premium', price: 13000 }
+  const updatedCatalog = catalog.map((addon) => addon.id === 'Analog A'
+    ? { ...addon, label: 'Analog A premium', price: 13000 }
     : addon);
   const updated = await owner.agent.put('/api/addons')
     .set('X-CSRF-Token', owner.csrfToken)
@@ -240,15 +240,15 @@ test('addon selections are priced from the catalog and remain unchanged in trans
   assert.equal(updated.status, 200, JSON.stringify(updated.body));
 
   const history = await cashier.agent.get(`/api/transactions/${created.body.transaction.id}`);
-  assert.equal(history.body.transaction.total, 47000);
-  assert.equal(history.body.transaction.addons[0].label, 'Camera analog');
+  assert.equal(history.body.transaction.total, 73000);
+  assert.equal(history.body.transaction.addons[0].label, 'Analog A');
   assert.equal(history.body.transaction.addons[0].price, 10000);
 
   const invalid = await cashier.agent.post('/api/transactions')
     .set('X-CSRF-Token', cashier.csrfToken)
     .send(rentalPayload({
-      addonIds: ['photographer-5', 'photographer-10'],
-      total: 37000,
+      addonIds: ['fotografer-5', 'fotografer-10'],
+      total: 43000,
       amountReceived: 40000,
     }));
   assert.equal(invalid.status, 400);
@@ -257,9 +257,9 @@ test('addon selections are priced from the catalog and remain unchanged in trans
   const stalePrice = await cashier.agent.post('/api/transactions')
     .set('X-CSRF-Token', cashier.csrfToken)
     .send(rentalPayload({
-      addonIds: ['analog-camera'],
-      total: 22000,
-      amountReceived: 25000,
+      addonIds: ['Analog A'],
+      total: 25000,
+      amountReceived: 28000,
     }));
   assert.equal(stalePrice.status, 400);
   assert.equal(stalePrice.body.error.code, 'PRICE_MISMATCH');
@@ -374,27 +374,27 @@ test('owner catalog edits do not alter transaction snapshots and owner can void 
     .send(rentalPayload());
   const owner = await login(app, 'owner');
 
-  const updatedCamera = await owner.agent.put('/api/cameras/casio')
+  const updatedCamera = await owner.agent.put('/api/cameras/canon-ixus-160')
     .set('X-CSRF-Token', owner.csrfToken)
-    .send({ name: 'Casio Updated', price1: 18000, price2: 22000 });
+    .send({ name: 'Canon Ixus 160 Updated', price1: 18000, price2: 22000 });
   assert.equal(updatedCamera.status, 200);
   const history = await cashier.agent.get(`/api/transactions/${created.body.transaction.id}`);
-  assert.equal(history.body.transaction.cameraName, 'Casio');
-  assert.equal(history.body.transaction.total, 12000);
+  assert.equal(history.body.transaction.cameraName, 'Canon Ixus 160');
+  assert.equal(history.body.transaction.total, 15000);
 
-  const cashierCannotEditCatalog = await cashier.agent.put('/api/cameras/casio')
+  const cashierCannotEditCatalog = await cashier.agent.put('/api/cameras/canon-ixus-160')
     .set('X-CSRF-Token', cashier.csrfToken)
     .send({ name: 'Unauthorized', price1: 1, price2: 2 });
   assert.equal(cashierCannotEditCatalog.status, 403);
-  const cashierCannotDeleteCamera = await cashier.agent.delete('/api/cameras/casio')
+  const cashierCannotDeleteCamera = await cashier.agent.delete('/api/cameras/canon-ixus-160')
     .set('X-CSRF-Token', cashier.csrfToken);
   assert.equal(cashierCannotDeleteCamera.status, 403);
-  const deletedCamera = await owner.agent.delete('/api/cameras/casio')
+  const deletedCamera = await owner.agent.delete('/api/cameras/canon-ixus-160')
     .set('X-CSRF-Token', owner.csrfToken);
   assert.equal(deletedCamera.status, 204);
   const historyAfterDelete = await cashier.agent.get(`/api/transactions/${created.body.transaction.id}`);
-  assert.equal(historyAfterDelete.body.transaction.cameraName, 'Casio');
-  assert.equal(historyAfterDelete.body.transaction.items[0].cameraName, 'Casio');
+  assert.equal(historyAfterDelete.body.transaction.cameraName, 'Canon Ixus 160');
+  assert.equal(historyAfterDelete.body.transaction.items[0].cameraName, 'Canon Ixus 160');
 
   const noReason = await owner.agent.patch(`/api/transactions/${created.body.transaction.id}/void`)
     .set('X-CSRF-Token', owner.csrfToken)
@@ -465,12 +465,12 @@ test('reports are role-scoped and owner can download a PDF summary', async () =>
   const cashierSummary = await cashierOne.agent.get(`/api/reports/summary?date=${date}`);
   assert.equal(cashierSummary.status, 200);
   assert.equal(cashierSummary.body.totals.transactionCount, 1);
-  assert.equal(cashierSummary.body.totals.revenue, 12000);
+  assert.equal(cashierSummary.body.totals.revenue, 15000);
 
   const owner = await login(app, 'owner');
   const ownerSummary = await owner.agent.get(`/api/reports/summary?date=${date}`);
   assert.equal(ownerSummary.body.totals.transactionCount, 2);
-  assert.equal(ownerSummary.body.totals.revenue, 24000);
+  assert.equal(ownerSummary.body.totals.revenue, 30000);
   const defaultSummary = await owner.agent.get('/api/reports/summary');
   assert.equal(defaultSummary.status, 200);
   assert.equal(defaultSummary.body.period.to, date);

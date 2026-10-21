@@ -404,7 +404,7 @@ td small { display: block; margin-top: 5px; color: #a69a9f; font-size: 11px; }
 .catalog-image-preview { position: relative; margin-bottom: 5px; }
 .catalog-image-preview .camera-art { height: 118px; }
 .hidden-input { display: none; }
-.image-upload-button { position: absolute; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 5px; min-height: 27px; padding: 0 8px; border: 1px solid #f0e4e7; border-radius: 6px; background: #fffffff2; color: #9b6875; cursor: pointer; font-size: 10px; font-weight: 600; }
+.image-upload-button { position: absolute; z-index: 2; bottom: 8px; display: flex; align-items: center; gap: 5px; min-height: 27px; padding: 0 8px; border: 1px solid #f0e4e7; border-radius: 6px; background: #fffffff2; color: #9b6875; cursor: pointer; font-size: 10px; font-weight: 600; }
 .catalog-save { margin-top: 14px; }
 .catalog-form-note { display: flex; align-items: flex-start; gap: 6px; margin: 11px 0 0; color: #9eaaa4; font-size: 10px; line-height: 1.5; }
 .catalog-form-note svg { flex: 0 0 auto; color: #7faf9c; }
