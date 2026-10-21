@@ -396,6 +396,11 @@ test('owner catalog edits do not alter transaction snapshots and owner can void 
   assert.equal(historyAfterDelete.body.transaction.cameraName, 'Canon Ixus 160');
   assert.equal(historyAfterDelete.body.transaction.items[0].cameraName, 'Canon Ixus 160');
 
+  const cashierCannotVoid = await cashier.agent.patch(`/api/transactions/${created.body.transaction.id}/void`)
+    .set('X-CSRF-Token', cashier.csrfToken)
+    .send({ reason: 'Tidak diizinkan' });
+  assert.equal(cashierCannotVoid.status, 403);
+
   const noReason = await owner.agent.patch(`/api/transactions/${created.body.transaction.id}/void`)
     .set('X-CSRF-Token', owner.csrfToken)
     .send({ reason: '' });
@@ -466,6 +471,8 @@ test('reports are role-scoped and owner can download a PDF summary', async () =>
   assert.equal(cashierSummary.status, 200);
   assert.equal(cashierSummary.body.totals.transactionCount, 1);
   assert.equal(cashierSummary.body.totals.revenue, 15000);
+  const cashierPdf = await cashierOne.agent.get(`/api/reports/summary/pdf?date=${date}`);
+  assert.equal(cashierPdf.status, 403);
 
   const owner = await login(app, 'owner');
   const ownerSummary = await owner.agent.get(`/api/reports/summary?date=${date}`);

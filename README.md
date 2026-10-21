@@ -17,24 +17,27 @@ website. Customers do not book or pay through the site.
 - **Camera catalog:** Owners can add, edit, deactivate, reactivate, and delete
   cameras, update their one- and two-hour rental prices, and upload camera
   photos. Cashiers see active products only.
-- **Rental transactions:** Create a receipt with one or more cameras, individual
-  rental durations, and manual pricing for rentals longer than two hours. The
-  app calculates end times, totals, cash change, and validates prices on the
-  server.
+- **Rental transactions:** Create a transaction with one or more cameras,
+  individual rental durations, optional add-ons, and manual pricing for rentals
+  longer than two hours. The app calculates end times, totals, cash change, and
+  validates prices on the server.
 - **Add-on catalog:** Select optional property items, photographer packages,
   photo prints, and file-transfer methods. Owners can change add-on names and
-  prices, deactivate options, add new options, or delete them. File-transfer
-  options are initially free.
+  prices, activate/deactivate options, add new options, or delete them.
+  File-transfer prices come from the catalog; the seeded options are not all
+  free.
 - **Receipts:** Preview, print, and reprint customer receipts on 58 mm thermal
   paper, or print an admin order copy. Selected add-ons and their prices appear
   on the receipt.
-- **Transaction history:** Cashiers can access their own transactions; owners
-  can review all transactions, verify QRIS payments, void transactions, and
-  review business reports.
+- **Transaction history:** Cashiers can access and verify QRIS payments for
+  their own transactions; owners can review all transactions, verify QRIS
+  payments, void transactions with a reason, and review business reports.
 - **Reports:** Owners can view daily, weekly, and monthly summaries and download
   a PDF report.
 - **Data snapshots:** Product names and prices are saved with each transaction,
   so later catalog edits or deletions do not change existing receipts.
+- **Owner catalog management:** Owners can create, update, activate/deactivate,
+  and delete cameras and add-ons. Camera photos can also be uploaded or replaced.
 
 ### QRIS payments
 
@@ -96,6 +99,8 @@ The initial login usernames are:
 The backend creates its SQLite database and seeds the initial camera and
 add-on catalogs on first launch. Changing password variables after the
 database has been initialized does not change existing account passwords.
+Cashier 1 is restricted to Cafe transactions and Cashier 2 to Event transactions;
+the API enforces these location assignments.
 
 ### Run frontend and backend separately
 
@@ -166,12 +171,20 @@ backend configuration.
 │   │   ├── app.js
 │   │   ├── db.js
 │   │   └── server.js
-│   └── tests/
+│   ├── tests/
+│   └── uploads/            # Camera images and private guarantee photos
+├── .data/                  # SQLite database (default path)
 ├── PRD-evarti.md
 ├── README-hosting.md
 ├── package.json
 └── README.md
 ```
 
-The SQLite database and uploaded files contain operational data. Back them up
-appropriately before deploying or moving the application.
+Transactions are append-only in the application: saved transactions cannot be
+edited or deleted; an Owner can void one with a reason. Camera and add-on
+catalog changes do not rewrite transaction snapshots.
+
+The SQLite database, `.env`, camera images, and private guarantee photos contain
+operational or sensitive data. Keep the database and uploads persistent across
+deployments, back them up securely, and do not expose the upload directories
+through the web server.

@@ -275,6 +275,9 @@ export function createTransactionsRouter({ db, privateUploadDir, guaranteeUpload
 
   router.patch('/:id/void', (request, response, next) => {
     try {
+      if (request.user.role !== 'owner') {
+        throw new HttpError(403, 'Akses tidak diizinkan untuk peran ini.', 'FORBIDDEN');
+      }
       const reason = typeof request.body?.reason === 'string' ? request.body.reason.trim() : '';
       if (!reason || reason.length > 500) throw new HttpError(400, 'Alasan void wajib diisi (maksimal 500 karakter).', 'VALIDATION_ERROR');
       const row = db.prepare(`${transactionSelect} WHERE t.id = ?`).get(request.params.id);

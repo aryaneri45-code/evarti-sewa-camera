@@ -18,7 +18,9 @@ Konsepnya:
 - Browser mengakses `https://app.example.com`
 - Nginx melayani frontend statis
 - Nginx meneruskan request `/api/*` ke backend di `http://localhost:3000`
-- Backend menggunakan SQLite, jadi cukup satu server dan data tersimpan di local disk
+- Backend menggunakan SQLite dan menyimpan database serta file upload di disk
+  server; direktori data tersebut harus dipersistenkan saat deploy atau pindah
+  server
 
 ## 2. Persiapan server
 
@@ -82,6 +84,8 @@ Catatan penting:
 - `COOKIE_SECURE=true` wajib pada production agar cookie session hanya dikirim via HTTPS
 - Password akun harus kuat dan minimal 12 karakter
 - Jangan pernah commit file `.env` ke GitHub
+- Password environment variable hanya dipakai untuk membuat akun pada inisialisasi
+  pertama; mengubahnya kemudian tidak merotasi password di database.
 
 Jika frontend dan API dipakai dari domain yang sama, maka file `Front-end/.env` bisa dibiarkan kosong atau dibuat seperti ini:
 
@@ -96,6 +100,11 @@ Jika frontend dipisah dengan subdomain seperti `https://api.example.com` dan `ht
 ```env
 VITE_API_URL=https://api.example.com
 ```
+
+Frontend dan API harus berada pada origin yang diizinkan CORS. Cookie sesi
+menggunakan `SameSite=Strict`; gunakan domain yang sama atau subdomain yang
+berada pada site yang sama. Pemisahan ke domain/site berbeda dapat membuat
+browser menolak cookie sesi meskipun CORS sudah dikonfigurasi.
 
 ## 5. Install dependency dan build frontend
 
@@ -241,7 +250,7 @@ Cek log backend:
 pm2 logs evarti-api --lines 100
 ```
 
-## 11. Persiapan data dan backup
+## 11. Penyimpanan data dan backup
 
 Karena aplikasi memakai SQLite, file database utama disimpan di path yang didefinisikan pada `DATABASE_PATH`.
 
@@ -251,20 +260,34 @@ Contoh default:
 /var/www/evarti-sewa-camera/.data/evarti.sqlite
 ```
 
-Direkomendasikan:
+Secara default, backend menyimpan unggahan di:
 
-- backup database rutin via cron
-- backup file `.env`
-- backup folder `uploads/`
-- simpan backup di lokasi lain (S3, Dropbox, atau server backup lain)
+```text
+/var/www/evarti-sewa-camera/back-end/uploads/cameras/  # Foto kamera
+/var/www/evarti-sewa-camera/back-end/uploads/private/  # Foto jaminan privat
+```
 
-Contoh backup sederhana:
+Folder foto jaminan berisi data sensitif dan tidak boleh dipublikasikan atau
+disajikan sebagai file statis oleh Nginx. Pastikan `.data/`, `.env`, dan
+`back-end/uploads/` tetap ada setelah pembaruan aplikasi. Simpan backup terenkripsi
+atau batasi aksesnya, dan letakkan salinan di server/lokasi terpisah.
+
+Untuk salinan konsisten yang sederhana, hentikan API terlebih dahulu agar
+SQLite dapat menutup file dan menulis perubahan yang tertunda. Lalu salin
+database, konfigurasi, dan semua unggahan:
 
 ```bash
+pm2 stop evarti-api
 mkdir -p /var/backups/evarti
-cp /var/www/evarti-sewa-camera/.data/evarti.sqlite /var/backups/evarti/
+cp -a /var/www/evarti-sewa-camera/.data /var/backups/evarti/
+cp -a /var/www/evarti-sewa-camera/back-end/uploads /var/backups/evarti/
 cp /var/www/evarti-sewa-camera/.env /var/backups/evarti/
+chmod 600 /var/backups/evarti/.env
+pm2 restart evarti-api
 ```
+
+Jalankan backup berkala dan uji proses pemulihannya. Jangan menaruh salinan
+backup di direktori yang disajikan oleh Nginx.
 
 ## 12. Troubleshooting umum
 
@@ -316,8 +339,10 @@ Solusi:
 ├── Front-end/
 │   └── dist/
 ├── back-end/
-│   └── src/
-├── uploads/
+│   ├── src/
+│   └── uploads/
+│       ├── cameras/
+│       └── private/
 └── package.json
 ```
 
@@ -336,13 +361,16 @@ Solusi:
 - API: `https://api.example.com`
 - `VITE_API_URL=https://api.example.com`
 - `FRONTEND_ORIGIN=https://app.example.com`
+- Pastikan frontend dan API tetap berada pada site yang sama agar cookie sesi
+  `SameSite=Strict` dapat dikirim browser.
 
 ## 15. Catatan tambahan
 
 - Aplikasi ini memerlukan SSL di production agar cookie session aman
 - Database SQLite cocok untuk deployment kecil hingga menengah
 - Untuk kebutuhan skala besar, pertimbangkan migrasi ke PostgreSQL/MySQL di masa depan
-- Pastikan selalu backup konfigurasi `.env` dan file uploads sebelum perubahan besar
+- Foto jaminan bersifat privat; jangan menyajikan folder upload backend sebagai aset publik
+- Pastikan backup database, konfigurasi `.env`, dan semua file uploads sebelum perubahan besar
 
 ## 16. Contoh workflow deploy singkat
 
@@ -356,13 +384,3 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 Jika semua langkah di atas sudah berhasil, aplikasi Anda sudah dapat diakses dari domain yang sudah dikonfigurasi.
-
----
-
-Jika Anda ingin, saya juga bisa bantu membuat versi dokumen yang lebih spesifik untuk:
-
-- VPS Ubuntu 22.04
-- DigitalOcean
-- Linode / Vultr
-- Plesk / cPanel
-- atau deployment dengan Docker

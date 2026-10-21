@@ -168,6 +168,9 @@ export function createReportsRouter({ db }) {
 
   router.get('/summary/pdf', (request, response, next) => {
     try {
+      if (request.user.role !== 'owner') {
+        throw new HttpError(403, 'Akses tidak diizinkan untuk peran ini.', 'FORBIDDEN');
+      }
       const filters = reportFilters(request);
       const summary = db.prepare(`
         SELECT COUNT(*) AS transaction_count,
